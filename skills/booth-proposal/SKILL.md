@@ -113,13 +113,29 @@ Sketch five or six ideas, one line each with a rough size against the frame; cho
 
 Follow references/image-prompts.md. The image model is the imagination here: give it a short prompt and the reference images – the client's own booths and anything the user or client likes – and let it design the picture.
 
-1. Write a short View 1 prompt per concept (about 150–250 words, English): the idea and its hero in two or three sentences; the brand colours; a three-line size block ([W] × [D] as person-heights, the whole stand including the hero on one platform with nothing outside it, the open sides, the hero's height as a multiple of a person); the program in one line; how the logo is used; no ceiling, overhead frame or hanging element; a few visitors, one at the front edge; one line on what to keep and evolve from the attached references and what not to copy. No camera settings, light recipes, material lists, layout coordinates or avoid lists.
+1. Write a short View 1 prompt per concept (about 200–300 words, English): the idea and its hero in two or three sentences; the brand colours; a three-line size block ([W] × [D] as person-heights, the whole stand including the hero on one platform with nothing outside it, the open sides, the hero's height as a multiple of a person); the program in one line (only what a visitor sees; storage as a door in the back wall, never a room); how the logo is used; no ceiling, overhead frame or hanging element; a few visitors, one at the front edge; one line on what to keep and evolve from the attached references and what not to copy. No camera settings, light recipes, material lists, layout coordinates or avoid lists.
 2. Attach the reference image files to every View 1 call; a written description never replaces them. Make two candidates per concept, for all three concepts first: `python scripts/render.py hero --prompt concepts/A/prompts/hero.txt --ref <each reference> --out-dir concepts/A/renders --n 2`.
 3. Choose ONE candidate per concept – the two are candidates, not a pair: the most premium image that carries the idea clearly. Check it by eye, with the people as the scale: width, depth, hero height, open sides, program, nothing extra, no invented or garbled text, correct counts.
 4. Fix details by editing that image with one correction sentence (`python scripts/render.py fix --base <image> --add "<sentence>" --out-dir concepts/A/renders`); at most three fixes per view. If the size is clearly wrong (more than about 20 %, or the hero outside the platform), take the other candidate or regenerate instead of fixing.
 5. Make View 2 (front) as an edit of the chosen View 1, so both show the same stand (`python scripts/render.py front --prompt concepts/A/prompts/front.txt --base <chosen View 1> --out-dir concepts/A/renders`), check it the same way, and stamp both (`python scripts/render.py label <image> --title "A · [name]" --out concepts/A/A-1-hero.png`, then A-2-front.png).
 
-The render critique asks first: does it look premium, at least as good as the client's references? Is the idea readable? Is the size right? One image per view, never a collage. `--dry-run` shows a request without sending it. Without an image tool, give the prompt pack. Never describe an image as generated when it was not.
+The render critique asks first: does it look premium, at least as good as the client's references? Is the idea readable? Is the size right? One image per view, never a collage. Never describe an image as generated when it was not.
+
+**Running the calls.**
+- Before the first real call, run the View 1 command once with `--dry-run`: it shows the endpoint, the attached references and where the key was found, without sending anything (it does not test whether the key works).
+- Tell the user how many images you are about to make (usually six View 1 candidates, then up to three fixes and one View 2 per concept); they are paid API calls.
+- One `hero --n 2` call takes about 2–4 minutes. Give the command a 10-minute timeout or run it in the background, and run the three concepts in parallel. Never start a second call while one is still running: new files are numbered after the existing ones (hero-v3.png, hero-v4.png…), so a duplicate run costs money.
+- Look at every result as an image (in Claude Code, Read the .png) before choosing. Record the choice and a one-line reason in concepts/A/concept.md (`chosen: renders/hero-v2.png – …`).
+- Leave `--fidelity` out: gpt-image-2 does not accept it (render.py drops it and retries if it is sent).
+- As soon as the three View 1 images are chosen, send the user a short message with them, then continue with Step 5 unless the user wants changes.
+
+**When a call fails** (render.py prints the server's message and exits 1), keep going with the other concepts and report which views are missing:
+- 401 (bad key): tell the user the key is wrong and how to set it (below); give the prompt pack for now.
+- 403/404, model not available to the account: retry once with `--model gpt-image-1`; otherwise the prompt pack.
+- 400 refused by the content policy: soften the wording (no disease imagery, no real people) and retry once.
+- 429 or 5xx after the script's own retries, or a timeout: retry once a few minutes later.
+
+**Without a key** (render.py stops with "No API key found"): tell the user to add a line `OPENAI_API_KEY=sk-…` to a `.env` file in the project folder (or set the environment variable, which takes precedence), and meanwhile write the prompt pack: each concept's prompts/hero.txt and prompts/front.txt plus pack/prompt-pack.md listing, per concept, the prompt, the reference files to attach and the View 2 instruction. Then continue with Step 5, writing each geometry spec from the idea instead of a chosen image, and present the pitch with the prompts in place of the images.
 
 ## Step 5 – Develop
 
@@ -144,7 +160,8 @@ When you can write files (Claude Code, Codex, an IDE, or any agent with a worksp
 ```
 <project>/
   input/        the RFP, venue manual, client materials, reference images (never modified)
-  brief/        requirement-card.md, venue-card.md, frame.md, content.md, style-cards.md (reused across runs)
+  brief/        requirement-card.md, venue-card.md, frame.md, content.md (with the message platform),
+                style-cards.md (reused across runs); ideas.md (insight, ideas considered, the three chosen, rejected with reasons)
   concepts/A/   concept.md, geometry.json, plan.png, plan.svg, massing-hero.png, massing-front.png (appendix only),
                 prompts/hero.txt, prompts/front.txt, renders/ (every attempt with its .prompt.txt and .json log),
                 A-1-hero.png, A-2-front.png (the chosen, stamped pair)

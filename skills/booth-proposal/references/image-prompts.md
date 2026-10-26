@@ -9,7 +9,7 @@ Person-heights are always worked out in metres: a person is 1.75 m (about 5.75 f
 ## The three rules
 
 1. **Send the references themselves.** Attach the reference image files to every View 1 call (`--ref`): the client's own previous booth, any booth or render the client or the user likes. They carry the client's taste, the structure they recognise, the finish and the polish far better than words. A written description never replaces an attached image, and the references are never turned into a list of things to avoid. In the prompt, say only what to do with them: which part to keep and evolve (the portal, the wall), and what not to copy (their slogans, posters, other companies' stands). Never attach a massing image or a plan; they are for the appendix only.
-2. **Keep the prompt short.** About 150–250 words: the idea, the hero in two or three sentences, the brand colours, the essentials, one line about the references. No camera settings, light recipes, material lists, avoid lists or layout coordinates. A long prompt turns the model into an illustrator of a specification and the picture goes stiff.
+2. **Keep the prompt short.** About 200–300 words (the fixed lines of the template are already about 150): the idea, the hero in two or three sentences, the brand colours, the essentials, one line about the references. No camera settings, light recipes, material lists, avoid lists or layout coordinates. A long prompt turns the model into an illustrator of a specification and the picture goes stiff.
 3. **Anchor the size in three lines, check the rest afterwards.** The prompt keeps one short size block of three lines (width and depth as person-heights, the whole stand and the hero on one platform with nothing outside it and the open sides, the hero's height as a multiple of a person); without it the model enlarges the stand to fit the idea. Program and details are checked by eye on the result and fixed by editing it (below).
 
 The two View 1 images per concept are two **candidates** to choose from, not a pair. The pair shown to the client is the chosen View 1 and its View 2, edited from it, so both show the same stand.
@@ -27,7 +27,7 @@ Size – keep it exactly:
 - The whole stand, the hero included, stands on that platform; nothing stands outside it. Open at [sides].
 - The tallest element, [the hero], is [H] m, about [H in m / 1.75] times a person.
 
-Essentials: [the program in one line: screen, product displays, counter, seating, interactive]. The letters "[NAME]" once; no other text. No ceiling, no overhead frame, nothing hung from the hall ceiling. A few visitors for scale, one standing at the front edge.
+Essentials: [the program in one line – only what a visitor sees: screen, product displays, counter, seating, interactive; storage only as "a door in the back wall", never as a room]. The letters "[NAME]" once; no other text. No ceiling, no overhead frame, nothing hung from the hall ceiling. A few visitors for scale, one standing at the front edge.
 The attached photos show [what they are]. Keep what makes it theirs – [its signature structure, e.g. the rounded portal arch], [the palette], [the glow], [the logo] – and evolve it into this new design, clearly more premium and refined. Do not copy [their slogans, posters, roll-up banners, neighbouring stands].
 ```
 
@@ -99,7 +99,7 @@ Image models garble text, especially Chinese. Keep legible text to the client's 
 
 ## Budget
 
-Per concept: two View 1 candidates, up to three fixes, one View 2; each image takes one to two minutes.
+Per concept: two View 1 candidates, up to three fixes, one View 2 – about six to eighteen paid images for three concepts. One `hero --n 2` call takes about 2–4 minutes: give it a 10-minute timeout or run it in the background, run the three concepts in parallel, and never start a duplicate call (files are numbered, so a duplicate costs money). Failures and the no-key case: SKILL.md Step 4.
 
 ## Without an image tool
 
