@@ -5,3 +5,7 @@ Thumbs.db
 # local project workspaces
 projects/
 *-workspace/
+# local inputs, generated outputs and secrets
+.env
+input/
+output/
