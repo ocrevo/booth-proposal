@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: geometry-conflict-caught
+expected_outcome: |
+  Before any prompt, the skill writes a geometry spec, runs the check and finds that six 0.7 m steps in the depth
+  direction need 4.2 m and cannot fit 3 m. It changes the design (steps along the width, fewer or shallower steps),
+  keeps room for the table and counter, passes the check, makes massing images, and only then writes locked prompts.

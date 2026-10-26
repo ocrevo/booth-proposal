@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: concepts-from-rfp
+expected_outcome: |
+  Design first: an insight, then three concepts from three territories, each with manifesto, idea, experience, what it
+  says, atmosphere, a passing geometry check, plan and massing images, prompts that open with the fixed-geometry block,
+  and a creative director note; an appendix with frame card (area and depth budgets), assumptions, compliance per
+  concept and rejected ideas.
+context:
+  scaffold_script: place-files.sh

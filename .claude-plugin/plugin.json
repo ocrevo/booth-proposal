@@ -1,0 +1,12 @@
+{
+  "name": "booth-proposal",
+  "version": "0.4.0",
+  "description": "A design-first studio partner for exhibition booth proposals: brief, frame, ideas, geometry-checked concepts, locked renders and a pitch pack",
+  "author": {
+    "name": "ocrevo"
+  },
+  "homepage": "https://github.com/ocrevo/booth-proposal",
+  "repository": "https://github.com/ocrevo/booth-proposal",
+  "license": "MIT",
+  "keywords": ["exhibition", "trade show", "booth", "stand design", "RFP", "proposal"]
+}

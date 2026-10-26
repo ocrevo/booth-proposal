@@ -1,0 +1,7 @@
+interface:
+  display_name: "Booth Proposal"
+  short_description: "Turn a booth RFP and reference photos into three draft proposals"
+  default_prompt: "Use the booth-proposal skill. I have uploaded the RFP and reference images. start"
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: us-inline-line-of-sight
+expected_outcome: |
+  Geometry specs in feet with a height zone limiting the front 5 ft to 4 ft, rigging_allowed false and the program in
+  required; every concept passes; at least one idea uses the low-front, tall-back rule creatively; dimensions in feet
+  with metres in brackets.

@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: brief-from-rfp
+expected_outcome: |
+  In step mode the skill stops after step 1 with a requirement card and assumptions: 6 m x 4 m corner stand open
+  front and right, max 4.5 m, no hanging, the full program with sources, deliverables with schedule and price out of
+  scope, and assumptions (with basis and impact) instead of questions. Nothing is invented.
+context:
+  scaffold_script: place-files.sh
