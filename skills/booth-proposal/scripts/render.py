@@ -1,21 +1,24 @@
 """Booth renders: make concept renders with an image model, then place a logo and stamp the draft label.
 
-Renders are concept visualisations, not construction drawings. The hero view is generated from the written brief
-alone; the front view and every fix are edits of an approved render, so the design, materials and light carry over.
+Renders are concept visualisations, not construction drawings. The hero view (View 1) comes from a short prompt
+with the reference image files attached (--ref; then the call goes to the edit endpoint, without --ref to the
+generation endpoint); ask for two candidates and choose one. The front view (View 2) and every fix are edits of
+the chosen render, so the design, materials and light carry over. Massing images are never sent here.
 Each saved image gets two sidecars: <name>.prompt.txt (the exact prompt sent) and <name>.json (mode, model, size,
 quality, input images, usage from the response, seconds, timestamp). Existing renders are never overwritten: new
 files are numbered after the highest <view>-v<k>.png already in the output folder.
 
 Usage:
   python render.py hero  --prompt hero.txt --out-dir concepts/A/renders [--n 2] [--ref ref1.jpg --ref ref2.jpg]
-                         -> hero-v<k>.png from the brief; --ref attaches reference photos (the client's booths,
-                            images they like) so the model sees the finish and brand feel to aim for
+                         -> hero-v<k>.png, one per candidate; --ref (repeatable) attaches the reference images
+                            (the client's booths, images they like), which no written description replaces
   python render.py front --prompt front.txt --base concepts/A/renders/hero-v2.png --out-dir concepts/A/renders
                          -> front-v<k>.png, the front view edited from the chosen hero render
-  python render.py fix   --base renders/hero-v2.png --prompt hero.txt --add "one correction sentence" --out-dir renders
-                         [--view hero]
+  python render.py fix   --base renders/hero-v2.png --add "one correction sentence" --out-dir renders
+                         [--view hero] [--prompt hero.txt]
                          -> <view>-v<k>.png, the base render with that one change; the view defaults to the base
-                            file's own name (front-v1.png -> front), else hero
+                            file's own name (front-v1.png -> front), else hero. For details; a clearly wrong size
+                            (more than about 20 %, or the hero off the platform) needs a new hero instead
   python render.py label render.png --title "A · The Ribbon" --out final.png
                          -> a dark strip at the bottom right: "<title>  ·  初稿 – 概念效果示意，不用于施工 /
                             Draft – concept visualization, not for construction"
@@ -26,8 +29,8 @@ Usage:
 
 Options for hero, front and fix:
   --model gpt-image-2   --size 1536x1024   --quality high   --n 1 (images per call, 1-10)
-  --fidelity high|low   sends input_fidelity with an edit (front, fix); if the model rejects it, the call is retried
-                        once without it. A generation has no input image, so hero does not send it.
+  --fidelity high|low   sends input_fidelity with any call that has input images (front, fix, hero with --ref); if
+                        the model rejects it, the call is retried once without it. hero without --ref does not send it.
   --dry-run             print the endpoint, fields, input images, prompt and output names; no network call
   --provider openai     PROVIDERS holds each provider's endpoints; only OpenAI's request format is implemented
 
@@ -429,17 +432,17 @@ def main(argv=None):
     api.add_argument("--fidelity", choices=["high", "low"], help="input_fidelity for edits; sent only when given")
     api.add_argument("--provider", choices=list(PROVIDERS), default="openai")
     api.add_argument("--dry-run", action="store_true", help="print the request and output names, send nothing")
-    p = sub.add_parser("hero", parents=[api], help="generate the hero view from the brief")
+    p = sub.add_parser("hero", parents=[api], help="View 1 candidates from a short prompt and the reference images")
     p.add_argument("--prompt", required=True)
     p.add_argument("--ref", action="append", help="a reference photo the model sees (repeatable): the client's booths, "
                                                   "images they like; with --ref the call goes to the edit endpoint")
-    p = sub.add_parser("front", parents=[api], help="edit the front view from a hero render")
+    p = sub.add_parser("front", parents=[api], help="View 2: edit the front view from the chosen hero render")
     p.add_argument("--prompt", required=True)
-    p.add_argument("--base", required=True, help="the hero render to start from")
+    p.add_argument("--base", required=True, help="the chosen hero render to start from")
     p = sub.add_parser("fix", parents=[api], help="apply one correction to a render")
     p.add_argument("--base", required=True, help="the render to correct")
     p.add_argument("--add", required=True, help="the correction, one sentence")
-    p.add_argument("--prompt", help="the original brief, appended for reference")
+    p.add_argument("--prompt", help="the original View 1 prompt, appended for reference")
     p.add_argument("--view", help="output name stem; default: the base file's view, else hero")
     p = sub.add_parser("label", help="stamp the draft note")
     p.add_argument("image")

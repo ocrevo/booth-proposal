@@ -30,6 +30,8 @@ Assumptions to check with the organiser
 
 These items feed the frame card and every geometry spec: height limits and zones go to `max_height` and `height_zones`, rigging to `rigging_allowed`, and any stated minimum walkway or headroom to `walkway` and `headroom`.
 
+The card lives in `brief/venue-card.md` and is reused across runs: a new run copies it and updates it only when a manual or a confirmed answer arrives.
+
 ## Checklist of what to look for in a venue manual
 
 - Booth types and the rules for each (inline, corner, peninsula, island), including how high walls may be near the aisle and near neighbours

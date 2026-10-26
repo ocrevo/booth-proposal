@@ -1,7 +1,7 @@
 schema_version: "1.1"
 name: geometry-conflict-caught
 expected_outcome: |
-  Before any prompt, the skill writes a geometry spec, runs the check and finds that six 0.7 m steps in the depth
+  The skill sizes the idea against the frame (or runs the geometry check) and finds that six 0.7 m steps in the depth
   direction need 4.2 m and cannot fit 3 m. It changes the design (steps along the width, fewer or shallower steps),
-  keeps room for the table and counter, passes the check, and only then writes render prompts that describe the
-  corrected size and layout in words.
+  keeps room for the table and counter, writes a geometry spec whose check passes, and the final short View 1 prompt
+  and renders show the corrected design; anything rendered before the fix is rendered again.

@@ -48,7 +48,7 @@ Typical values to start from; the designer and suppliers confirm them. Use feet 
 
 ## The frame card
 
-Write this in step 2, before ideation. The user sees it only on `show frame` and in the appendix.
+Write this in step 2, before ideation. The user sees it only on `show frame` and in the appendix. It lives in `brief/frame.md` with the other fact cards and is reused across runs: a new run copies it instead of redoing it, and changes only what a changed fact affects.
 
 ```
 FRAME · v1 · <project>
@@ -64,4 +64,4 @@ Brand rules (tier 3): <colours, fonts, logo rules, imagery rules>
 Design freedom: <choices the brief leaves open>
 ```
 
-The `required` list in every geometry spec comes from the program table, so the check proves each concept holds the whole program.
+The program table also gives the one-line program in each View 1 prompt (references/image-prompts.md), and the `required` list in every geometry spec, so the check proves each concept holds the whole program.

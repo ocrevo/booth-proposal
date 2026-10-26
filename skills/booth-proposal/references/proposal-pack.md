@@ -14,12 +14,13 @@ The idea          <two or three sentences: the insight and how the space express
 The experience    At 10 m … · At 3 m … · Inside … · The photo moment …
 What it says      Headline: <L1> · Key messages: <L2, at most three>
 Atmosphere        <material, colour and light in one or two sentences; a short palette line with HEX>
+                  Signature detail · Supporting system · Intensity (references/art-direction.md), one line each
 
 [View 2 – the front view]
 [Plan drawing]
 
 Creative director's note: <one honest line: the strength and the risk>
-Draft – concept visualization, not for construction. Dimensions follow the geometry spec and the plan; the renders were checked against them by eye.
+Draft – concept visualization, not for construction. Dimensions follow the geometry spec and the plan; the renders were checked by eye, with the people as the scale.
 ```
 
 ## Comparison, after the three concepts
@@ -28,7 +29,7 @@ Draft – concept visualization, not for construction. Dimensions follow the geo
 | --- | --- | --- | --- |
 | Idea | | | |
 | Feeling | | | |
-| Design territory | | | |
+| Starting point (the client's booth it evolves, or the territory) | | | |
 | Best for a client who wants… | | | |
 | Main risk | | | |
 
@@ -45,11 +46,11 @@ Draft – concept visualization, not for construction. Dimensions follow the geo
    Every Partly met or Not met row says why and what would fix it. Never mark Met unless an element of this concept clearly delivers it.
 5. **Deliverables** requested by the RFP, including those handled separately (pricing, staffing, graphic designs), so nothing silently disappears.
 6. **Content**: the message platform, one content map per concept, the claims for client sign-off and the content to request from the client (references/content-strategy.md).
-7. **Geometry**: per concept, the check result (PASS, with any warnings and how they were handled), the key dimensions, the two massing images, and the size check of each render (what was judged, and any fix made).
+7. **Geometry**: per concept, the check result (PASS, with any warnings and how they were handled), the key dimensions, the two massing images (made from the spec; they appear only here), and the check of each chosen render (size, open sides, program, text: what was judged, and any fix or regeneration).
 8. **Items to verify** with the venue or builder (structure, rigging, power, fire certification, food service – only what applies).
 9. **Ideas considered**: the rejected ideas, one line each with the reason.
-10. **Built from**: versions of the brief, references and assumptions each concept used.
+10. **Built from**: versions of the brief, references and assumptions each concept used, and the chosen render files.
 
 ## Writing
 
-Short, vivid sentences. Concrete nouns over adjectives: "a wall of clear glass tubes catching the light" rather than "an innovative, premium display". No jargon or IDs outside the appendix.
+Short, vivid sentences. Concrete nouns over adjectives: "a wall of clear glass tubes catching the light" rather than "an innovative, premium display". No jargon or IDs outside the appendix. Describe what the chosen images show: text, images and plan present the same stand.

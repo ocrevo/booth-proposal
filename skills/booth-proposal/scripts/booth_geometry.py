@@ -1,17 +1,20 @@
 """Booth geometry: check that a concept fits its envelope, and draw it as a white scaled model for the appendix.
 
 The geometry spec (JSON) is the single source of truth for a concept's dimensions. The geometry check, the plan
-drawing (draw_plan.py) and the massing images all read the same file. Renders are generated freely and checked
-against the spec afterwards; the massing images are documentation, never an image-model input.
+drawing (draw_plan.py) and the massing images all read the same file. The spec is written after the renders, from
+the chosen View 1, and fixes that design at its real size; if the check fails, the design changes and is rendered
+again. The massing images are appendix documentation only, never an image-model input.
 
 Usage:
-  python booth_geometry.py check   spec.json
+  python booth_geometry.py check   spec.json      -> errors, warnings and "RESULT: PASS" or "RESULT: FAIL" (exit 1)
   python booth_geometry.py massing spec.json out [--views hero,front] [--size 1536x1024]
                                    -> out-hero.png (three-quarter view from the open corner), out-front.png
-  python booth_geometry.py hints   spec.json      -> prints every element's render_hint for the image prompt
+  python booth_geometry.py hints   spec.json      -> prints every element's render_hint (what its pieces stand for)
 
-Massing views: eye level 1.6 m, 35 mm, a 1.75 m person for scale, fitted so the stand fills the frame.
-A spec may fix a camera: "camera": {"hero": {"eye": [x, y, z], "target": [x, y, z], "lens_mm": 35}}.
+Massing views: a white scaled model seen through a pinhole camera at eye level 1.6 m, 35 mm, with a 1.75 m person
+for scale, fitted so the stand fills the frame. A spec may fix a camera:
+"camera": {"hero": {"eye": [x, y, z], "target": [x, y, z], "lens_mm": 35}}. "wall_height" draws the closed sides
+as walls of that height.
 
 Spec:
 {
@@ -22,7 +25,7 @@ Spec:
     {"id": "Z1", "label": "Counter", "kind": "zone", "shape": "box",
      "x": 3.9, "y": 2.15, "w": 1.8, "h": 0.5, "z": 0, "height": 1.1},
     {"id": "Z2", "label": "Ring 1", "kind": "overhead", "shape": "frame",
-     "x": 0, "y": 2.75, "w": 6, "h": 0.12, "height": 4.2, "band": 0.3},
+     "x": 0, "y": 2.75, "w": 6, "h": 0.12, "height": 4.2, "band": 0.3, "support": "legs"},
     {"id": "Z3", "label": "Table", "kind": "furniture", "shape": "cylinder",
      "x": 2.35, "y": 1.36, "w": 0.6, "h": 0.6, "height": 0.75}
   ]
@@ -34,7 +37,8 @@ shape: box (default) | cylinder (w is the diameter; h is ignored) | frame (a por
        along "axis" ("x", the default: d from the element's x across its width, swept over its depth h;
        or "y": d from the element's y across its depth, swept over its width w); use it for shells, canopies,
        vaults, ribbons, steps).
-kind: hero | zone | furniture | overhead | brand. "contains": true lets an element enclose others in plan
+kind: hero | zone | furniture | overhead (any other word, such as brand, is a plain element).
+"contains": true lets an element enclose others in plan
 (for example a canopy over a lounge) without counting as an overlap.
 
 Constraints the check enforces (all optional except width, depth, max_height):
@@ -49,14 +53,16 @@ Per element:
   "repeat": {"count": 75, "dx": 0.056, "dy": 0, "height_to": 4.2}
                                  a row of identical pieces (fins, steps, columns): count pieces, each moved by dx/dy;
                                  heights run linearly from "height" to "height_to". The whole row must fit, and it is
-                                 checked as one block, so count x pitch errors are caught before rendering.
+                                 checked as one block, so count x pitch errors are caught.
   "group": "ridge"               members of a group are one compound piece: no overlap or walkway checks between
                                  them, and the group's bounding box is checked against everything else
   "program": "counter" or ["counter", "storage"]   which required items it serves
-  "support": "floor" | "wall" | "legs" | "columns" | "hung"   required for overhead, frame and extrusion elements
-  "render_hint": "..."           how the image prompt should describe this element when its spec shape is only an
-                                 approximation ("one continuous layered mountain ridge, low at the left, highest near
-                                 the right"); printed by `hints`, pasted into the image prompt
+  "support": "floor" | "wall" | "legs" | "columns" | "hung"   state it for every overhead, frame and extrusion element;
+                                 a missing support is a warning, "hung" where rigging_allowed is false an error
+  "render_hint": "..."           what the element really looks like (as in the chosen render) when its spec shape is
+                                 only an approximation ("one continuous layered mountain ridge, low at the left,
+                                 highest near the right"); printed by `hints`. A note for reading plan, massing and
+                                 render together, not text for a View 1 prompt
   "layer": 0                     manual paint order for the massing (lower paints first); only needed when two
                                  pieces intersect, e.g. a ribbon resting on a counter
 """
@@ -226,12 +232,12 @@ def check(spec):
         print("ERROR  ", m)
     for m in warnings:
         print("WARNING", m)
-    print("RESULT: PASS" if not errors else "RESULT: FAIL – fix the design before rendering")
+    print("RESULT: PASS" if not errors else "RESULT: FAIL – change the design, update the spec, then re-render the affected views")
     return not errors
 
 
 def hints(spec):
-    """Print each element's render_hint, ready to paste into the image prompt."""
+    """Print each element's render_hint: what its approximate spec shape stands for."""
     for e in spec["elements"]:
         if e.get("render_hint"):
             print(" ".join(f'{e["id"]} {e.get("label", "")}:'.split()), e["render_hint"])

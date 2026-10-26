@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: reference-first
+expected_outcome: |
+  The client's previous stand (previous-stand.png, a deep green rounded portal arch) is treated as the starting point.
+  The skill looks at the image and names its signature structure; at least two of the three concepts grow out of the
+  arch, each pushed in a different direction and made clearly more premium; the third may break away. Every View 1
+  render command (or the prompt pack) attaches previous-stand.png as a reference image (render.py hero --ref), and
+  each View 1 prompt carries one short line on what to keep and evolve and what not to copy, with no written
+  description standing in for the image.
+context:
+  scaffold_script: place-files.sh

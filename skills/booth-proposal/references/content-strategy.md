@@ -28,6 +28,8 @@ Flags: `number`, `superlative` (first, only, largest, leading), `comparative`, `
 
 Never add facts that are not in the files. If the brief needs content the client has not supplied (for example product claims for a product that is only named), list it under "Content to request from the client".
 
+The inventory lives in `brief/content.md` and is reused across runs: a new run copies it and adds only what new client files bring.
+
 ## 2. Select: find what is most representative
 
 Score each item from 1 to 3 on five questions:
@@ -74,6 +76,8 @@ Content belongs in the architecture, not on posters added to it. Before assignin
 
 Keep at least half of the booth's visible surfaces free of text. If the content does not fit, cut content, not space.
 
+The content map is not written into image prompts: a render shows the client's name and little else, and any other text in it is checked and removed if garbled or invented (references/image-prompts.md). The content map says where the copy goes; the designer applies it.
+
 ## 5. Output
 
 **Message platform** (shared by all concepts, built in step 3):
@@ -87,7 +91,7 @@ Claims for client sign-off: exact wording, source, flag
 Content to request from the client
 ```
 
-**Content map** (one per concept, built in step 4 on the final geometry):
+**Content map** (one per concept, built in Develop, step 5, on the final geometry and the chosen render):
 
 ```
 | Surface | Level | Copy (draft) | From | Note |

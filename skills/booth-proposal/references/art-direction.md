@@ -1,6 +1,6 @@
 # Art direction – think like the creative director of a top studio
 
-This tool belongs to a design company. Design leads what the client sees; constraints shape the thinking underneath (references/frame.md). Read the frame card first, then this file, before you develop ideas and before you write any image prompt.
+This tool belongs to a design company. Design leads what the client sees; constraints shape the thinking underneath (references/frame.md). Read the frame card first, then this file, before you develop ideas. This file guides the concepts and their critique; none of it is written into an image prompt (references/image-prompts.md keeps the prompts short).
 
 ## How great booth concepts are made
 
@@ -12,15 +12,19 @@ Work in this order, inside the frame. Each step feeds the next; skipping to form
 4. **Form.** The hero element that carries the idea, and how the rest of the space supports it. Space follows the idea; the layout comes from here, not from a template. Size the idea against the frame at once: a gesture that only works at a size the booth does not have is not an idea for this booth.
 5. **Atmosphere.** Light, material, colour and, where it helps, sound and scent, each chosen because it tells the idea, not because it is fashionable.
 6. **Graphics and content.** What the booth says, chosen and placed with references/content-strategy.md: one headline, a few proof points, the brand placed with precision, the most important content carried by the hero itself. Typography that belongs to the brand.
-7. **Craft.** Proportions, joints, edges, how surfaces meet the floor. The details that separate a studio's work from a contractor's. Name one **signature detail** per concept (a 3 cm shadow gap between bands, a counter floating on a reveal, brass pins on the peaks); it goes into the content map's hero row and, if the idea depends on it, into the render prompt.
+7. **Craft.** Proportions, joints, edges, how surfaces meet the floor. The details that separate a studio's work from a contractor's. Name one **signature detail** per concept (a 3 cm shadow gap between bands, a counter floating on a reveal, brass pins on the peaks); it goes into the concept text and the content map's hero row; it reaches the View 1 prompt only as part of the hero's two or three sentences, when the idea depends on it.
 
 ## Diverge, then choose
 
-Do not develop the first three ideas you think of. Sketch five or six, one line each, from at least four territories, each with a rough size against the frame. Then choose three from three different territories using the critique questions for Insight, Idea and Specificity and a rough fit. Keep a line on each rejected idea for the appendix; clients and designers like to see the road not taken.
+Do not develop the first three ideas you think of. Sketch five or six, one line each, each with a rough size against the frame; use the territories below to vary them. Then choose three that clearly differ from each other, using the critique questions for Insight, Idea and Specificity and a rough fit. Keep a line on each rejected idea for the appendix; clients and designers like to see the road not taken.
+
+When the client's own previous booth is among the references, at least two of the three grow out of its signature structure (its portal, its arch, its wall), each pushed in a different direction and made clearly more premium; the third may break away. A concept that drops what the client recognises needs a strong reason, written down.
+
+As soon as the three are chosen, make their View 1 images (references/image-prompts.md); develop them afterwards.
 
 ## Design territories
 
-The three concepts must come from three different territories, so the client is choosing between genuinely different experiences. Pick the three that best fit the brand and the brief:
+The territories are a source of variety, not a rule: the three concepts need not come from three different territories, but the client must be choosing between genuinely different experiences. Use them to push ideas in different directions:
 
 | Territory | What leads | Example of the feeling |
 | --- | --- | --- |
@@ -31,7 +35,7 @@ The three concepts must come from three different territories, so the client is 
 | Media and interaction | Moving image or responsive surfaces used as architecture | The space reacts to you |
 | Nature and the organic | Living or organic forms, grown rather than built | Calm, alive, human |
 
-Different territories should also produce different palettes and material families. If two concepts share the same base colour and main material, change one.
+The three concepts should also look different: if two share the same hero form, main material and light, change one. Concepts that grow from the same reference structure differ in where they take it.
 
 ### Supporting systems
 
@@ -59,7 +63,7 @@ The three concepts are not all restrained unless the client's register (style ca
 
 ## Principles
 
-- **Use the constraint.** The frame is material, not an obstacle. A shallow stand suggests a façade, a sequence along the aisle or an overhead gesture rather than a deep space; a strict height zone suggests a low, horizontal landmark; a tight program suggests a hero that is also the counter or the screen wall.
+- **Use the constraint.** The frame is material, not an obstacle. A shallow stand suggests a façade or a sequence along the aisle rather than a deep space; a strict height zone suggests a low, horizontal landmark; a tight program suggests a hero that is also the counter or the screen wall.
 - **Specific, not generic.** The concept should belong to this client only. No-swap test: replace the logo with a competitor's; if the booth still works just as well, the idea is too generic. Start again from the insight.
 - **One hero.** One element carries the idea at full strength; everything else supports it quietly.
 - **Coherence.** Every material, light and graphic choice can be explained by the idea.
@@ -86,7 +90,7 @@ Use this list when shaping ideas, not to strip the renders: what the client love
 
 ## Creative director critique
 
-After developing the three concepts (geometry checked, text written), switch roles: you are a demanding creative director who has seen every booth at every major fair and is hard to impress. Write two or three blunt sentences per concept about what is weak, generic or unresolved. Then score it from 1 to 5:
+After developing the three chosen concepts (geometry checked, text written to match the chosen image), switch roles: you are a demanding creative director who has seen every booth at every major fair and is hard to impress. Write two or three blunt sentences per concept about what is weak, generic or unresolved. Then score it from 1 to 5:
 
 | Criterion | Question |
 | --- | --- |
@@ -100,10 +104,10 @@ After developing the three concepts (geometry checked, text written), switch rol
 | Fit | Does the idea work at its real size, inside the envelope, with headroom and walkways? (The geometry check must pass.) |
 | Craft | Proportions, details and finishes: would a top studio sign it? |
 
-A concept that scores below 4 on Insight, Idea or Specificity is rebuilt from a new insight, not patched. Other criteria below 4 are revised. Do the same critique on every render. Show the user the critique in one line per concept; the scores only if asked.
+A concept that scores below 4 on Insight, Idea or Specificity is rebuilt from a new insight, not patched. Other criteria below 4 are revised. A rebuilt or reshaped concept is rendered again. Show the user the critique in one line per concept; the scores only if asked.
 
 Two checks across the set:
 - **Supporting systems differ**: no two concepts share floor, seating and light temperature.
 - **No empty words**: concept text that leans on 科技感, 高端大气, 打造, "premium feel", "cutting-edge", or "immersive" without saying how, fails Specificity until it names the material, light or form that does the work.
 
-On every render, ask first: would the client say "wow"? Does it look premium, polished and finished, at least as good as the references they gave? Is the idea readable at a glance?
+Every render gets its own short critique. Ask first: does it look premium, polished and finished, at least as good as the client's references? Is the idea readable at a glance? Is the size right, with the people as the scale?

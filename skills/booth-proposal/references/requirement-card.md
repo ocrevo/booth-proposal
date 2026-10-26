@@ -2,6 +2,8 @@
 
 The requirement card is the single source of truth for what the client asked for. It works quietly in the background: precise here, brief in front of the user. It also holds the design brief, the human side of the RFP that the concepts are built on.
 
+It lives in `brief/requirement-card.md` and is reused across runs: a new run copies it instead of reading everything again, and updates it only when files or facts change (raising the version).
+
 ## Rules
 
 - One requirement per row. If a sentence in the RFP asks for two things, make two rows.

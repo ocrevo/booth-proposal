@@ -3,26 +3,29 @@
 Usage:  python draw_plan.py spec.json out_basename
 Writes out_basename.png and out_basename.svg.
 
-It reads the same geometry spec as booth_geometry.py (key "elements"; the older key "zones" also works).
-Elements with shape "frame" are drawn as overhead portals with their legs.
+It reads the same geometry spec as booth_geometry.py, unchanged (key "elements"; the older key "zones" also works).
+Elements with shape "frame" are drawn as overhead portals with their legs; shape "cylinder" (or "circle") as a
+circle; a "repeat" row piece by piece with one label; everything else, extrusions included, by its footprint.
 
-plan.json:
+Spec (only the keys the plan uses):
 {
   "title": "A · Rings of Time",
   "subtitle": "6 m × 3 m · open front and right",
   "width": 6, "depth": 3, "unit": "m",
   "open_sides": ["front", "right"],
   "accent": "#1F5FAE",
-  "zones": [
+  "elements": [
     {"label": "Hero portal", "x": 0, "y": 2.4, "w": 6, "h": 0.6, "kind": "hero"},
-    {"label": "Lounge", "x": 2.4, "y": 1.0, "w": 1.0, "h": 1.0, "kind": "furniture", "shape": "circle"}
+    {"label": "Lounge", "x": 2.4, "y": 1.0, "w": 1.0, "h": 1.0, "kind": "furniture", "shape": "cylinder"}
   ]
 }
 Coordinates: x from the left wall, y from the back wall toward the main aisle (front).
-kind: "hero" (tinted in the accent colour), "zone" (light tone), "furniture" (outline only),
+kind: "hero" (tinted in the accent colour), "zone" (light tone), "furniture" and any other kind (outline only),
 "overhead" (dashed accent outline, the drawing convention for elements above head height;
 add "legs": true to mark where it touches the floor at both ends).
 Optional "label_pos": "top" puts a zone's label near its top edge, for a zone that contains others.
+Closed sides are drawn as thick walls, open sides dashed, with the aisle marked. With Chinese labels and no CJK
+font installed, elements are numbered and the legend is printed.
 """
 import json
 import sys
@@ -163,5 +166,7 @@ def draw(spec, out):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 3 or sys.argv[1] in ("-h", "--help"):
+        sys.exit(__doc__)
     with open(sys.argv[1], encoding="utf-8") as f:
         draw(json.load(f), sys.argv[2])

@@ -2,11 +2,13 @@
 
 > FICTIONAL EXAMPLE. The client, the event and every fact are invented (see halvard-rfp.md). It shows the expected depth and order of the work; it is not a template to copy.
 
-Files next to this one: halvard-rfp.md (the brief), halvard-geometry-A.json (geometry spec of concept A), halvard-plan-A.png, halvard-massing-A-hero.png and halvard-massing-A-front.png.
+Files next to this one: halvard-rfp.md (the brief), halvard-geometry-A.json (geometry spec of concept A), halvard-plan-A.png, halvard-massing-A-hero.png and halvard-massing-A-front.png (appendix only).
+
+Order of the work: Brief → Frame → Ideas → Visualise (fast start) → Develop → Pitch pack.
 
 ---
 
-## Part 1 – Background cards (shown to the user only on `show` and in the appendix)
+## Part 1 – The work in order (the cards are shown to the user only on `show` and in the appendix)
 
 ### Requirement card (excerpt)
 
@@ -77,6 +79,54 @@ Message platform: headline options "75 years of precision you can trust" (C1, C5
 | A photo timeline wall | Graphic | Rejected: a nostalgic collage, on the cliché list |
 | A robot-arm show | Media | Rejected: fails the no-swap test; every automation brand does it |
 
+No reference images came with this RFP, so there is no style card and the prompts have no reference line. Had the client sent photos of its previous stand, they would be attached to every View 1 call, and at least two of the three concepts would grow out of that stand's signature structure.
+
+### Visualise (fast start, right after the three ideas)
+
+View 1 prompt for concept A, in English, about 180 words:
+
+```
+A stunning, high-end exhibition stand design visualization for Halvard Instruments, a maker of laboratory balances, pipetting systems and liquid handlers since 1952, at LabWorld Europe 2027.
+
+Idea – "Seventy-Five": 75 slender aluminium fins, one for every year since 1952, stand in a row in front of a Halvard-green back wall. Their heights rise in one perfectly even curve from the left to the right – seventy-five years, one line of precision.
+
+Make it look premium and memorable. Brand colours: Halvard Green #0F4D3A and white.
+Size – keep it exactly:
+- One 6 m × 4 m platform, about 3.4 person-heights wide and 2.3 person-heights deep.
+- The whole stand, the fins included, stands on that platform; nothing stands outside it. Open at the front and the right side.
+- The tallest element, the last fin, is 4.2 m, about 2.4 times a person.
+Essentials: a storage room with a 75-inch screen, a long vitrine with three instruments, a demo bench facing the aisle, a coffee counter, a meeting table for four. The letters "HALVARD" once; no other text. No ceiling, no overhead frame, nothing hung from the hall ceiling. A few visitors for scale, one standing at the front edge.
+```
+
+```
+python scripts/render.py hero --prompt concepts/A/prompts/hero.txt --out-dir concepts/A/renders --n 2
+```
+
+The two images are candidates; choose the one that looks most premium and shows the curve most clearly. Check it by eye with the people as the scale: front edge about 3.4 person-heights, front edge to back wall about 2.3, the tallest fin about 2.4 times a person; open on the front and right; vitrine, bench, counter, table and screen present; nothing hung, no extra room; only "HALVARD" legible. If the stand is drawn a little too deep, fix it with one sentence:
+
+```
+python scripts/render.py fix --base concepts/A/renders/hero-v2.png --add "The stand is only 4 m deep, about 2.3 person-heights from the front edge to the back wall; bring the back wall forward and keep every design element." --out-dir concepts/A/renders
+```
+
+If it is clearly too big (more than about 20 %) or the fins stand off the platform, take the other candidate or regenerate instead. View 2 is an edit of the chosen View 1:
+
+```
+The same exhibition stand as in this image, same design, materials, colours and light, every element in the same place, seen from the front: from the main aisle, nearly straight on, the whole 6 m width visible with some hall on both sides. A few visitors for scale. No other changes.
+```
+
+```
+python scripts/render.py front --prompt concepts/A/prompts/front.txt --base concepts/A/renders/hero-v3.png --out-dir concepts/A/renders
+python scripts/render.py label concepts/A/renders/hero-v3.png  --title "A · Seventy-Five" --out concepts/A/A-1-hero.png
+python scripts/render.py label concepts/A/renders/front-v1.png --title "A · Seventy-Five" --out concepts/A/A-2-front.png
+```
+
+### Develop (after the renders)
+
+1. Geometry spec (halvard-geometry-A.json): the fins are one `repeat` row (75 pieces at 0.056 m, 1.2 m rising to 4.2 m, left to right as in the chosen image), the program in `required`, `rigging_allowed: false`. `booth_geometry.py check` → PASS (appendix).
+2. Plan (halvard-plan-A.png) and the two massing images for the appendix; they are never sent to the image model.
+3. Content map, then the concept text, written to match the chosen image.
+4. Creative director critique. Had the check failed, the design would change and View 1 and View 2 would be rendered again.
+
 ---
 
 ## Part 2 – What the user sees after `start`
@@ -102,7 +152,7 @@ Read the RFP; 6 assumptions, 2 of them high impact: the front is the main aisle,
 
 **Signature detail.** Each fin stands on a 1 cm shadow gap and carries its year laser-engraved at eye height. **Supporting system** (architectural): pale grey microcement floor, steel-framed chairs with grey leather seats at a honed stone table, white solid-surface vitrine, bench and counter. **Intensity:** restrained – one material, one colour, one gesture.
 
-Plan: halvard-plan-A.png · Massing (appendix): halvard-massing-A-hero.png, halvard-massing-A-front.png
+Plan: halvard-plan-A.png · Renders: A-1-hero.png, A-2-front.png (not included in this example)
 
 **Creative director's note.** Clear, ownable and calm. The risk: fins can read as an ordinary slatted wall, so the even curve and the engraved years must be crisp.
 
@@ -144,24 +194,9 @@ Plan: halvard-plan-A.png · Massing (appendix): halvard-massing-A-hero.png, halv
 | --- | --- | --- | --- |
 | Idea | 75 years as one rising measurement | Precision as a calm, controlled space | Craft you can touch |
 | Feeling | Confident, clear | Quiet, focused | Warm, crafted |
-| Territory | Architectural | Light and atmosphere | Material and craft |
+| Starting point | Architectural territory | Light and atmosphere territory | Material and craft territory |
+| Best for a client who wants… | One clear, confident statement | A calm place to talk | Quality you can touch |
 | Main risk | Reads as a slatted wall | Build time | Weight |
-
-### Prompt for concept A (View 1; the client's previous-stand photos attached as references)
-
-```
-A stunning, high-end exhibition stand design visualization for Halvard Instruments, a maker of laboratory balances, pipetting systems and liquid handlers since 1952, at LabWorld Europe 2027.
-
-Idea – "Seventy-Five": 75 slender brushed-aluminium fins, one for every year since 1952, rise in one perfectly even curve from 1.2 m to 4.2 m along the back of the stand, over a Halvard-green wall – seventy-five years, one line of precision.
-
-Make it look premium and memorable. Brand colours: Halvard Green #0F4D3A and white.
-Essentials: 6 m wide × 4 m deep corner stand on a low platform, open at the front and the right side; a storage block with a 75-inch screen, a long vitrine with three instruments, a demo bench facing the aisle, a coffee counter, a meeting table for four. The letters "HALVARD" once; no other text. No ceiling, nothing hung from the hall ceiling. A few visitors for scale.
-The attached photos show Halvard's previous stand: use them for the brand feel, the finish and the level of polish to aim for, then design a new stand; do not copy its layout.
-```
-
-View 2 is an edit of the chosen View 1 with the View 2 template (references/image-prompts.md); keep visible: the 75 fins, the HALVARD panel, the vitrine, the demo bench, the coffee counter, the meeting table.
-
-Size check of each render, by eye with the people as the scale: front edge about 3.5 person-heights; front edge to back wall about 2.3; the tallest fin about 2.4 times a person; open on the front and right; nothing hung, no extra room. If the stand is drawn too deep, fix it with one sentence: "The stand is too deep: it is only 4 m, about two and a quarter person-heights from the front edge to the back wall. Bring the back wall forward; keep every design element."
 
 ---
 
@@ -174,6 +209,8 @@ GEOMETRY CHECK · A · Seventy-Five · 6 × 4, max height 4.5
 Floor elements cover 7.7 of 24.0 (32%); walkway 0.90, headroom 2.10 m
 RESULT: PASS
 ```
+
+Massing: halvard-massing-A-hero.png, halvard-massing-A-front.png. Render size check: front edge about 3.4 person-heights, depth about 2.3, tallest fin about 2.4; one fix for depth.
 
 **How concept A meets the brief**
 
