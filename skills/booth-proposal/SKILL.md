@@ -1,6 +1,6 @@
 ---
 name: booth-proposal
-description: A design-first studio partner for exhibition and trade-show booths. Turns a booth RFP, tender or brief plus reference images into three art-directed concepts from different design territories, each with an idea, a visitor experience, what the booth says (a message platform and content map drawn from the client's own materials), an architectural-style plan and two concept renders (hero three-quarter view and front view) locked to real dimensions, with requirements, constraints, assumptions and RFP compliance handled quietly in an appendix. Use this skill whenever someone uploads a booth or exhibition-stand tender, RFP, brief or bid document, shares reference photos of booths, or asks to design, concept or pitch an exhibition booth or stand, even if they never say "proposal". Also use it for the commands start, step mode, change, add style, show, render, pack and status.
+description: A design-first studio partner for exhibition and trade-show booths. Turns a booth RFP, tender or brief plus reference images into three art-directed concepts from different design territories, each with an idea, a visitor experience, what the booth says (a message platform and content map drawn from the client's own materials), an architectural-style plan and two photographic concept renders (hero three-quarter view and front view) generated freely and checked against the real dimensions, with requirements, constraints, assumptions and RFP compliance handled quietly in an appendix. Use this skill whenever someone uploads a booth or exhibition-stand tender, RFP, brief or bid document, shares reference photos of booths, or asks to design, concept or pitch an exhibition booth or stand, even if they never say "proposal". Also use it for the commands start, step mode, change, add style, show, render, pack and status.
 ---
 
 # Booth Proposal
@@ -23,15 +23,15 @@ You are the creative partner of a design company: think and write like the creat
 | 1 Brief | Read the RFP and every client file: requirements, design brief, assumptions, content inventory | Every hard requirement has an ID and a source | references/requirement-card.md, references/venue-card.md, references/content-strategy.md |
 | 2 Frame | Sort constraints into four tiers; size the program; run the area and depth budgets | The frame card is complete | references/frame.md |
 | 3 Ideas | Insight, message platform, reference analysis; five or six quick ideas across territories, each roughly sized against the frame; choose three | Each chosen idea passes the no-swap test and fits the frame on a rough sizing | references/art-direction.md, references/content-strategy.md, references/style-card.md |
-| 4 Develop | Per concept: geometry spec, check, plan, massing, content map; then write the concept text from the final geometry; critique | Geometry check PASS; critique scores at least 4 | references/layout-card.md, references/content-strategy.md, references/art-direction.md |
-| 5 Visualise | Hero view and front view per concept, built on the massing images | Consistency and design checks pass, or the shortfall is reported | references/image-prompts.md |
+| 4 Develop | Per concept: geometry spec, check, plan, content map; then write the concept text from the final geometry; critique | Geometry check PASS; critique scores at least 4 | references/layout-card.md, references/content-strategy.md, references/art-direction.md |
+| 5 Visualise | Hero view generated freely from the prompt, front view edited from it; each checked by eye against the spec | Size and design checks pass, or the shortfall is reported | references/image-prompts.md |
 | 6 Pitch pack | Design first, appendix last | Every requirement accounted for | references/proposal-pack.md |
 
 references/art-direction.md is the heart of the design work and references/frame.md the heart of the constraints. A fictional worked example is in assets/examples/halvard-example.md, with its brief, geometry spec, plan and massing images next to it.
 
 ## Dependencies and changes
 
-Brief → Frame → Ideas → Geometry → (plan, massing, content map, concept text) → prompts → renders → pack.
+Brief → Frame → Ideas → Geometry → (plan, content map, concept text) → prompts → renders → pack.
 
 A change reruns only what lies downstream of where it lands, and raises versions there:
 - a fact or assumption in the brief → from the frame onward, for the concepts it affects;
@@ -46,8 +46,10 @@ Every card and concept records what it was built from, so you can tell what is a
 When `start` runs all six steps, the reply follows a studio pitch:
 
 1. One line on what you read, the number of assumptions, and only the high-impact ones by name.
-2. The three concepts, each opening with its name and a one-line manifesto, then the idea, the experience, what the booth says, the atmosphere, the plan, the renders (or their prompts and massing images) and a one-line creative director note.
-3. An appendix: brief, frame, assumptions, compliance per concept, geometry checks, content maps and sign-off list, ideas considered and rejected.
+2. The three concepts, each opening with its name and a one-line manifesto, then the idea, the experience, what the booth says, the atmosphere, the plan, the renders (or their prompts) and a one-line creative director note.
+3. An appendix: brief, frame, assumptions, compliance per concept, geometry checks with massing images, render size checks, content maps and sign-off list, ideas considered and rejected.
+
+On a chat platform without files, the reply carries the pitch and the comparison; the appendix follows on `show appendix`.
 
 Write the concepts the way a creative director talks to a client: vivid, specific, short sentences, no jargon or IDs.
 
@@ -74,7 +76,7 @@ The user can type a command or say the same in plain words, in any language.
 
 **Feasibility**
 - When constraints conflict, follow the order of authority in references/frame.md.
-- Dimensions live in the geometry spec, never in the render. A concept is visualised only after its geometry check passes; renders show design intent and prove nothing about size.
+- Dimensions live in the geometry spec, never in the render. A concept is visualised only after its geometry check passes. Renders are demonstrations, generated freely and then checked by eye against the spec; a render that would mislead the client about size or layout is fixed or not shown.
 - A failed check means the design changes, not just the numbers or the prompt.
 
 **Presentation**
@@ -96,14 +98,20 @@ Follow references/frame.md: sort every constraint into its tier, size the progra
 
 ## Step 3 – Ideas
 
-Write the insight and the message platform (references/art-direction.md; references/content-strategy.md, sections 2–3) and analyse references into style cards. Then sketch five or six ideas from at least four territories, one line each with a rough size against the frame. Choose three from three different territories using the critique questions for Insight, Idea and Specificity plus a rough fit. If the client supplied a reference they like, one of the three is its elevated evolution. Record the rejected ideas with one line on why.
+Write the insight and the message platform (references/art-direction.md; references/content-strategy.md, sections 2–3). Then look at every reference image yourself and name what makes it the client's own – its signature structure, colours, light, brand presence (style-card.md).
+
+**References are the starting point, not a mood.** When the client supplied their own previous booth or a booth they like, at least two of the three concepts grow out of its signature structure (its portal, its arch, its wall), each pushed in a different direction and made clearly more premium; the third may break away. A concept that drops what the client recognises needs a strong reason, written down.
+
+Sketch five or six ideas, one line each with a rough size against the frame; choose three that differ from each other, using the critique questions for Insight, Idea and Specificity plus a rough fit. Record the rejected ideas with one line on why.
+
+**Fast start:** as soon as the three ideas are chosen, make the View 1 candidates (Step 5, items 1–2) so the user sees pictures within minutes; develop the chosen images afterwards (Step 4), checking geometry against them.
 
 ## Step 4 – Develop
 
 For each concept, in this order:
 1. Write the geometry spec (references/layout-card.md), with the frame's program in `required`, the venue's rules (height zones, rigging, walkway, headroom) and a support for every overhead element.
 2. Run `python scripts/booth_geometry.py check spec.json` until it ends in PASS. Read the warnings and fix those on the visitor path.
-3. Draw the plan (`scripts/draw_plan.py`) and make the massing images (`scripts/booth_geometry.py massing`).
+3. Draw the plan (`scripts/draw_plan.py`) and make the massing images for the appendix (`scripts/booth_geometry.py massing`).
 4. Make the content map on the final geometry (references/content-strategy.md, section 4).
 5. Only now write the concept text: manifesto, idea, experience, what it says, atmosphere. Writing it last keeps the words true to the layout.
 6. Run the creative director critique (references/art-direction.md); rebuild or revise as it says, rerunning the check if the geometry changes.
@@ -112,7 +120,12 @@ Without code execution, write the spec anyway, check the dimension sums by hand 
 
 ## Step 5 – Visualise
 
-Follow references/image-prompts.md: each prompt opens with the fixed-geometry block; View 1 is generated on massing-hero.png, View 2 on massing-front.png with View 1 as the style reference; one image per view, never a collage. Check consistency against the massing images and run the critique on each image; at most three attempts per view. Without an image tool, give the prompt pack with the massing images. Never describe an image as generated when it was not.
+Follow references/image-prompts.md. The image model is the imagination here: give it a short prompt (the idea, the hero, brand colours, the essentials) and the reference images – the client's own booths and anything the user or client likes – and let it design the picture. Do not dictate camera, light, materials or layout, and never attach a massing image.
+1. Make two View 1 images per concept (`scripts/render.py hero --n 2 --ref <each reference>`), for all three concepts first.
+2. Choose per concept: the most premium image that carries the idea clearly; check the size by eye, with the people in the picture as the scale.
+3. Fix what would mislead (too deep, too tall, an extra room, a wrong open side) by editing the image with one correction sentence (`render.py fix`); at most three fixes per view.
+4. Make View 2 as an edit of the chosen View 1 (`render.py front`), check it the same way, and stamp both (`render.py label`).
+One image per view, never a collage. Without an image tool, give the prompt pack. Never describe an image as generated when it was not.
 
 ## Step 6 – Pitch pack
 
@@ -126,7 +139,9 @@ When you can write files (Claude Code, Codex, an IDE, or any agent with a worksp
 <project>/
   input/        the RFP, venue manual, client materials, reference images (never modified)
   brief/        requirement-card.md, venue-card.md, frame.md, content.md, style-cards.md
-  concepts/A/   concept.md, geometry.json, plan.png, massing-hero.png, massing-front.png, prompts.md, renders/
+  concepts/A/   concept.md, geometry.json, plan.png, massing-hero.png, massing-front.png (appendix),
+                prompts/hero.txt, prompts/front.txt, renders/ (every attempt with its .prompt.txt and .json log),
+                A-1-hero.png, A-2-front.png (the chosen, stamped pair)
   concepts/B/   …
   pack/         the pitch pack and any exports
 ```
@@ -135,5 +150,6 @@ If the user's files are not in `input/` yet, use them where they are and create 
 
 ## Platform notes
 
-- **ChatGPT** generates images natively and accepts reference images (attach the massing image, and View 1 for View 2). It can run Python, so both scripts work.
-- **Claude** does not generate images natively; use a connected image-generation tool that accepts reference images if available, otherwise give the prompt pack with the massing images. Both scripts run where code execution is enabled.
+- **Claude Code, Codex or any agent with a shell**: `scripts/render.py` calls the OpenAI Images API with `OPENAI_API_KEY` (or a `.env` line `OPENAI_API_KEY=` / `openai_key=`); `--ref` attaches the reference images. Without a key, give the prompt pack.
+- **ChatGPT** generates images natively: View 1 from the prompt with the reference images attached, View 2 by attaching View 1. It can run Python, so the geometry scripts work.
+- **Claude.ai** does not generate images natively; use a connected image-generation tool if available, otherwise give the prompt pack. The geometry scripts run where code execution is enabled.

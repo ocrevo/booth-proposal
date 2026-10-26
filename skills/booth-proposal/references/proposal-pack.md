@@ -19,7 +19,7 @@ Atmosphere        <material, colour and light in one or two sentences; a short p
 [Plan drawing]
 
 Creative director's note: <one honest line: the strength and the risk>
-Draft – concept visualization, not for construction. Dimensions follow the geometry spec and massing model, not the renders.
+Draft – concept visualization, not for construction. Dimensions follow the geometry spec and the plan; the renders were checked against them by eye.
 ```
 
 ## Comparison, after the three concepts
@@ -45,7 +45,7 @@ Draft – concept visualization, not for construction. Dimensions follow the geo
    Every Partly met or Not met row says why and what would fix it. Never mark Met unless an element of this concept clearly delivers it.
 5. **Deliverables** requested by the RFP, including those handled separately (pricing, staffing, graphic designs), so nothing silently disappears.
 6. **Content**: the message platform, one content map per concept, the claims for client sign-off and the content to request from the client (references/content-strategy.md).
-7. **Geometry**: per concept, the check result (PASS, with any warnings and how they were handled), the key dimensions and the two massing images.
+7. **Geometry**: per concept, the check result (PASS, with any warnings and how they were handled), the key dimensions, the two massing images, and the size check of each render (what was judged, and any fix made).
 8. **Items to verify** with the venue or builder (structure, rigging, power, fire certification, food service – only what applies).
 9. **Ideas considered**: the rejected ideas, one line each with the reason.
 10. **Built from**: versions of the brief, references and assumptions each concept used.

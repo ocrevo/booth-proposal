@@ -1,96 +1,91 @@
-# Concept renders – two views, art-directed
+# Concept renders – let the image model imagine
 
-Each concept gets two images of the same booth. They are what the client remembers, so they must look like a top studio's visualisation: one idea, a strong hero element, real materials, designed light, a calm and confident composition. Read references/art-direction.md before writing a prompt.
+Each concept gets two images of the same booth. They are what the client remembers, so they must look stunning and premium. The image model is the strongest imagination in this process: give it the idea, the references and the few facts that must hold, and let it design the picture. Do not dictate it.
 
-## The two views
+## The three rules
 
-- **View 1 – the hero image, eye level, three-quarter.** Camera at about 1.6 m (5 ft 3 in), in the main aisle near the open corner, looking diagonally into the booth. The hero dominates the picture, while the whole stand, its edges and both open sides stay visible so its real size can be read. 35 mm lens feel, verticals kept vertical.
-- **View 2 – front view.** Same eye level, on the booth's centre line in the main aisle, facing the front straight on, the full width visible with a little hall on each side. One-point perspective, calm near-symmetrical framing.
+1. **Send the references themselves.** Attach the reference image files to every View 1 call (`--ref`): the client's own previous booth, any booth or render the client or the user likes. They carry the client's taste, the structure they recognise, the finish and the polish far better than words. A written description never replaces an attached image, and the references are never turned into a list of things to avoid. In the prompt, say only what to do with them: which part to keep and evolve (the portal, the wall), and what not to copy (their slogans, posters, other companies' stands).
+2. **Keep the prompt short.** About 150–250 words: the idea, the hero in two or three sentences, the brand colours, the essentials, one line about the references. No camera settings, light recipes, material lists, avoid lists or layout coordinates unless the idea itself depends on them. A long prompt turns the model into an illustrator of a specification and the picture goes stiff.
+3. **Anchor the size in three lines, check the rest afterwards.** The prompt keeps one short size block (person-height ratios, everything on the platform, the hero's height); without it the model enlarges the stand to fit the idea. Open sides, program and details are checked by eye on the result and fixed by editing it (below).
 
-Make every view a separate image of one concept. Never combine concepts in one image, and never ask for a presentation board, collage, title or caption.
+Two images per concept are two **candidates** to choose from, not a pair. The pair shown to the client is the chosen View 1 and its View 2, edited from it, so both show the same stand.
 
-## Locking the geometry
-
-Image models do not obey dimensions written as words; they obey pictures much better. So the renders are built on the massing images from scripts/booth_geometry.py (references/layout-card.md):
-
-- View 1: attach `massing-hero.png` as the geometry reference.
-- View 2: attach `massing-front.png` as the geometry reference and the finished View 1 as the style reference.
-- Every prompt opens with the fixed-geometry block below, before any atmosphere or style.
-
-Even so, a render only shows design intent. Dimensions are governed by the geometry spec and its check, never by the image; say so under the images.
-
-## How to write a prompt that looks designed
-
-Image models fill every gap with the average trade-show booth. Within the locked geometry:
-
-1. **Lead with atmosphere and idea, not inventory.** Describe the feeling and the hero the way a designer talks about it: form, material, light. A list of zones produces a literal, crowded picture; the massing image already carries the layout.
-2. **Show only what serves the image.** Describe the hero and at most three supporting elements; the rest is in the massing image and the plan.
-3. **Name precise materials and light,** then the photography, then the clichés to avoid.
-
-## Prompt language and text
-
-Write prompts in English whatever language the user uses: image models follow English most reliably. Give the user a one-line summary in their language.
-
-Image models garble text, especially non-Latin scripts. Keep on-image text to the client's Latin-letter name and at most one short headline from the message platform. Surfaces that carry copy in the content map appear as clean panels or, where the copy is part of the architecture (engraved dates, names on a wall), as fine abstract lettering that is not meant to be read. The designer applies the real copy from the content map. Say so under the images.
-
-## Fixed-geometry block (opens every prompt)
+## View 1 prompt
 
 ```
-FIXED GEOMETRY – follow exactly; it overrides everything below.
-Use the attached white massing model as the exact geometry, proportions, positions and camera. Keep every element where it is and at the size shown; add only materials, colour, light, graphics and people.
-Stand: exactly [W] m wide × [D] m deep, open on [sides]; nothing extends beyond this footprint – no extra depth, no rear room, nothing in the aisle.
-Tallest element: [H] m. Scale: people about 1.75 m tall, counter [counter height] m, tables 0.75 m.
-If something does not fit, simplify it; never enlarge the stand or shrink furniture to implausible sizes.
-One photograph of this one stand only: no collage, no presentation board, no captions.
+A stunning, high-end exhibition stand design visualization for [client, what they do] at [event].
+
+Idea – "[name]": [the idea and its hero in two or three sentences, as you would tell the client].
+
+Make it look premium and memorable. Brand colours: [names and HEX].
+Size – keep it exactly: the whole stand, the hero included, stands on one [W] m × [D] m platform: about [W/1.75] person-heights wide and [D/1.75] person-heights deep; nothing stands outside the platform. Open at [sides]. The tallest element is [H] m, about [H/1.75] times a person.
+Essentials: [the program in one line: screen, product displays, counter, seating, interactive]. The letters "[NAME]" once; no other text. No ceiling, no overhead frame, nothing hung from the hall ceiling. A few visitors for scale, one standing at the front edge.
+The attached photos show [what they are]. Keep what makes it theirs – [its signature structure, e.g. the rounded portal arch], [the palette], [the glow], [the logo] – and evolve it into this new design, clearly more premium and refined. Do not copy [their slogans, posters, roll-up banners, neighbouring stands].
 ```
 
-Without a massing image (no code can run), replace the second line with the positions and sizes of the hero and the main elements from the geometry spec, in metres from the left wall and from the back wall.
-
-## View 1 template
+Run it with the references attached, two images per concept:
 
 ```
-[Fixed-geometry block]
-[One sentence of atmosphere: what it feels like to stand in front of this booth.]
-Award-level exhibition design for [client, sector] at a trade fair: concept "[name]" – [idea in one sentence].
-Hero: [the hero described as a designer would: form, material, finish, how light behaves on it].
-Supporting, kept quiet: [up to three elements, one short phrase each].
-Palette: [colours with HEX and where]. Materials: [materials with finishes]. Light: [light concept, colour temperature].
-Brand: [one clean panel for the logo; Latin name only if confirmed]; no other text.
-Camera: as in the massing image – eye level 1.6 m in the main aisle at the [left/right] front corner, three-quarter view, 35 mm, verticals corrected; the hero dominates, the whole stand and both open sides visible.
-Photography: editorial architectural photography, soft natural-looking light, true-to-life materials, subtle depth of field, two or three visitors in motion for scale.
-Setting: calm neutral exhibition hall, no other brands visible.
-Avoid: LED strip outlines, neon, RGB light, gradients, lens flare, glowing text, high-gloss plastic, multiple slogans, decorative swooshes, roll-up banners, clutter, generic white-and-oak minimalism, fisheye distortion, cartoon or game-engine look.
+python scripts/render.py hero --prompt concepts/A/prompts/hero.txt --ref input/ref-1.jpg --ref input/ref-2.jpg --out-dir concepts/A/renders --n 2
 ```
 
-## View 2 template (attach massing-front.png and the finished View 1)
+Without references, drop the last line of the prompt. Write prompts in English whatever the user's language; give the user a one-line summary in their language.
+
+## Choosing
+
+Make View 1 for all three concepts first, then choose one per concept: the image that looks most premium and carries the idea most clearly. Check it:
+
+| Check | How to judge |
+| --- | --- |
+| Size | With the people as the scale: the front about [W/1.75] person-heights wide, [D/1.75] deep, the hero about [H/1.75] times a person. Small deviations are fine |
+| Open sides | As in the spec |
+| Program | Screen, products, counter and seating present |
+| Nothing extra | No ceiling, hanging sign, extra room or second level |
+| Text | Only the client's name is legible; no invented words, dates or garbled characters |
+
+## Fixing
+
+Edit the chosen image with one sentence that names the problem; the design survives:
+
+| Problem | Correction sentence |
+| --- | --- |
+| Too deep | The stand is only [D] m deep, about [ratio] person-heights from the front edge to the back wall; bring the back wall forward and keep every design element. |
+| Too big or too small | The stand is [W] m wide and [D] m deep, about [ratios]; scale it to that size and keep the design. |
+| Hero height | The [hero]'s top is [H] m, about [ratio] times a person; adjust its height only. |
+| Extra structure | Remove the [ceiling / hanging sign / side room]; nothing else changes. |
+| Wrong count or names | Show exactly [n] [items]; [names]; nothing else changes. |
+| Garbled or invented text | Remove the [text] at [place]; that surface is plain; nothing else changes. |
+
+Edits change details well but barely change the scale of a whole stand: if the size is clearly wrong (the stand more than about 20 % too wide or deep, or the hero standing outside the platform), take the other candidate or regenerate, with the size block made stronger, instead of fixing. At most three fixes per image; otherwise take the other image or regenerate. If every candidate fails, show the closest and say what is off.
+
+## View 2
+
+An edit of the chosen View 1, so the design carries across:
 
 ```
-[Fixed-geometry block, referring to the attached front massing image]
-Same exhibition stand as in the attached View 1: keep the hero, every material, colour and light, and all elements in the same positions.
-Camera: as in the front massing image – eye level about 1.6 m, in the main aisle on the stand's centre line, facing the front straight on, one-point perspective, full width visible with a margin of hall on both sides.
-Elements to keep visible: [hero], [brand panel], [counter], [up to three more].
-Same editorial architectural photography and light. Do not add, remove or move anything.
+The same exhibition stand as in this image, same design, materials, colours and light, every element in the same place, seen from the front: from the main aisle, nearly straight on, the whole [W] m width visible with some hall on both sides. A few visitors for scale. No other changes.
 ```
 
-## After rendering
+```
+python scripts/render.py front --prompt concepts/A/prompts/front.txt --base concepts/A/renders/hero-v2.png --out-dir concepts/A/renders
+python scripts/render.py label concepts/A/renders/hero-v2.png --title "A · [name]" --out concepts/A/A-1-hero.png
+```
 
-**Consistency** between the two views:
+## Text and brand
 
-| Check | Pass / Fail | Note |
-| --- | --- | --- |
-| Footprint, heights and positions match the massing image (compare against the 1.75 m person) | | |
-| Hero element: same form, material, scale and position in both views | | |
-| Palette and materials | | |
-| Light character | | |
-| Brand panel position | | |
-| Counter and other named elements in the same places | | |
-| Open sides, as far as each view shows them | | |
-| Nothing added that is not in the concept | | |
+Image models garble text, especially Chinese. Keep legible text to the client's Latin-letter name; where the idea needs other words, check them and fix or remove what is wrong. If the client supplied a logo file, `render.py logo` places it after rendering. The designer applies the real logo and copy; say so under the images.
 
-**Design quality:** run the creative director critique from art-direction.md on each image. Ask in particular: does the hero read instantly, does it look like real materials and designed light, and is it free of every cliché?
+## Known habits of image models
 
-**Retry rules:** regenerate only the failing view with one sentence naming the fix ("the canopy must glow evenly from within; remove the bright edge lines"). At most three attempts per view; then show the best pair and say what still falls short. If View 1 fails, fix it before making View 2.
+- A grid of glowing circles becomes a wall of light bulbs; say what the light passes through.
+- Counted things (six leaves, three niches) come out with the wrong count; check and fix.
+- Calligraphy and long Chinese text come out as invented characters; ask for plain surfaces instead.
+- A stand drawn too deep is the commonest size error.
+
+## Budget
+
+Per concept: two View 1 images, up to three fixes, one View 2; each image takes one to two minutes.
 
 ## Without an image tool
 
-Give a prompt pack per concept: the two massing images, the View 1 prompt, the View 2 prompt, the instruction "generate View 1 with massing-hero.png attached; then View 2 with massing-front.png and View 1 attached", and the checks for the user to run.
+Give the prompt pack: the View 1 prompt, the references to attach, the View 2 prompt, and the checks above.

@@ -1,6 +1,8 @@
-# Spatial plan and geometry – derived from the idea, locked by numbers
+# Spatial plan and geometry – derived from the idea, fixed by numbers
 
-The plan follows the concept: start from where the hero must stand to be seen from the main aisle, then place everything else to support it. But an idea only counts once it fits at its real size. Image models do not respect dimensions written in words, so every concept gets a **geometry spec**: one JSON file that is the single source of truth for its dimensions. The plan drawing, the geometry check and the massing images that lock the renders are all made from it. The frame card (references/frame.md) supplies its limits and its required program.
+The plan follows the concept: start from where the hero must stand to be seen from the main aisle, then place everything else to support it. But an idea only counts once it fits at its real size, so every concept gets a **geometry spec**: one JSON file that is the single source of truth for its dimensions. The geometry check, the plan drawing and the appendix massing images all read it, and every render is checked against it by eye. The frame card (references/frame.md) supplies its limits and its required program.
+
+The spec never cages the renders: they are generated freely and then measured against it (references/image-prompts.md).
 
 ## Spatial strategies (a vocabulary, not a template)
 
@@ -24,7 +26,9 @@ The area and depth budgets in the frame card come first (references/frame.md). T
 
 ## The geometry spec
 
-The full format is in the docstring of scripts/booth_geometry.py. In short: x from the left wall as seen from the main aisle, y from the back wall toward the aisle, z up from the floor, sizes w (along x), h (along y) and height (along z), in the RFP's unit (`"unit": "m"` or `"ft"`). Shapes: box, cylinder, frame (a portal) and extrusion (a curved or stepped surface given by a profile, for shells, canopies, vaults and steps). Kinds: hero, zone, furniture, overhead, structure.
+The full format is in the docstring of scripts/booth_geometry.py. In short: x from the left wall as seen from the main aisle, y from the back wall toward the aisle, z up from the floor, sizes w (along x), h (along y) and height (along z), in the RFP's unit (`"unit": "m"` or `"ft"`). Shapes: box, cylinder, frame (a portal) and extrusion (a curved or stepped surface given by a profile along x or y, for shells, canopies, vaults, ribbons and steps). Kinds: hero, zone, furniture, overhead, structure.
+
+The spec records size, not form. A ridge, a ribbon or a field of discs is written as the boxes or profile that bound it; `group` makes several pieces one compound element for the check, and `render_hint` says in words what the pieces stand for, so the render prompt describes the real form (`python scripts/booth_geometry.py hints spec.json`).
 
 From the frame card, every spec carries: `max_height`, any `height_zones`, `rigging_allowed`, the venue's `walkway` and `headroom` if stated, and `required` (the program). Every element that serves a program item names it in `program`; every overhead, frame or extrusion element states its `support`. The check then proves the concept holds the whole program, respects every height rule, and does not hang anything the venue forbids.
 
@@ -32,7 +36,7 @@ Then run, in this order:
 
 1. `python scripts/booth_geometry.py check spec.json` – must end in `RESULT: PASS`. An error means the design does not fit: change the design (not the numbers in the prompt) and run it again. Read the warnings and fix the ones that matter (narrow passages on the main visitor path).
 2. `python scripts/draw_plan.py spec.json plan` – the plan drawing for the pitch.
-3. `python scripts/booth_geometry.py massing spec.json massing` – two white massing images (`massing-hero.png`, `massing-front.png`) from the cameras of View 1 and View 2, with a 1.75 m person for scale. They become the geometry reference for the renders.
+3. `python scripts/booth_geometry.py massing spec.json massing` – two white massing images (`massing-hero.png`, `massing-front.png`) with a 1.75 m person for scale, for the appendix. They document the sizes; they are never attached to an image prompt.
 
 Only when no code can run: write the spec anyway, do the check by hand (list each dimension sum), and use an ASCII plan (top row = back, bottom row = main aisle, one cell = 0.5 m or 2 ft, `#` closed wall, `.` open side, letters for zones, legend underneath).
 

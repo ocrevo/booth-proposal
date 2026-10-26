@@ -1,12 +1,17 @@
-"""Booth geometry: check that a concept fits its envelope, and render a scaled white massing model.
+"""Booth geometry: check that a concept fits its envelope, and draw it as a white scaled model for the appendix.
 
-The geometry spec (JSON) is the single source of truth for a concept's dimensions. The plan drawing
-(draw_plan.py), the geometry check and the massing images all read the same file, so the renders can be
-locked to real dimensions.
+The geometry spec (JSON) is the single source of truth for a concept's dimensions. The geometry check, the plan
+drawing (draw_plan.py) and the massing images all read the same file. Renders are generated freely and checked
+against the spec afterwards; the massing images are documentation, never an image-model input.
 
 Usage:
   python booth_geometry.py check   spec.json
-  python booth_geometry.py massing spec.json out_basename     -> out_basename-hero.png, out_basename-front.png
+  python booth_geometry.py massing spec.json out [--views hero,front] [--size 1536x1024]
+                                   -> out-hero.png (three-quarter view from the open corner), out-front.png
+  python booth_geometry.py hints   spec.json      -> prints every element's render_hint for the image prompt
+
+Massing views: eye level 1.6 m, 35 mm, a 1.75 m person for scale, fitted so the stand fills the frame.
+A spec may fix a camera: "camera": {"hero": {"eye": [x, y, z], "target": [x, y, z], "lens_mm": 35}}.
 
 Spec:
 {
@@ -24,10 +29,12 @@ Spec:
 }
 Coordinates in metres (or feet): x from the left wall as seen from the main aisle, y from the back wall
 toward the aisle, z up from the floor. w is the size along x, h the size along y, height along z.
-shape: box (default) | cylinder | frame (a portal: two legs and a top beam, "band" thick, spanning w)
-       | extrusion (a curved or stepped surface: "profile" is a list of [dx, z] points across the width,
-         dx from the element's x, extruded over its depth h; use it for shells, canopies, vaults, steps).
-kind: hero | zone | furniture | overhead. "contains": true lets an element enclose others in plan
+shape: box (default) | cylinder (w is the diameter; h is ignored) | frame (a portal: two legs and a top beam,
+       "band" thick, spanning w) | extrusion (a curved or stepped surface: "profile" is a list of [d, z] points
+       along "axis" ("x", the default: d from the element's x across its width, swept over its depth h;
+       or "y": d from the element's y across its depth, swept over its width w); use it for shells, canopies,
+       vaults, ribbons, steps).
+kind: hero | zone | furniture | overhead | brand. "contains": true lets an element enclose others in plan
 (for example a canopy over a lounge) without counting as an overlap.
 
 Constraints the check enforces (all optional except width, depth, max_height):
@@ -43,11 +50,20 @@ Per element:
                                  a row of identical pieces (fins, steps, columns): count pieces, each moved by dx/dy;
                                  heights run linearly from "height" to "height_to". The whole row must fit, and it is
                                  checked as one block, so count x pitch errors are caught before rendering.
+  "group": "ridge"               members of a group are one compound piece: no overlap or walkway checks between
+                                 them, and the group's bounding box is checked against everything else
   "program": "counter" or ["counter", "storage"]   which required items it serves
   "support": "floor" | "wall" | "legs" | "columns" | "hung"   required for overhead, frame and extrusion elements
+  "render_hint": "..."           how the image prompt should describe this element when its spec shape is only an
+                                 approximation ("one continuous layered mountain ridge, low at the left, highest near
+                                 the right"); printed by `hints`, pasted into the image prompt
+  "layer": 0                     manual paint order for the massing (lower paints first); only needed when two
+                                 pieces intersect, e.g. a ribbon resting on a counter
 """
+import argparse
 import itertools
 import json
+import math
 import sys
 
 WALKWAY_M = 0.9    # minimum comfortable passage between floor elements, in metres; check local rules
@@ -60,22 +76,25 @@ def unit_factor(spec):
     return 3.28084 if spec.get("unit", "m") == "ft" else 1.0
 
 
-def load(path):
-    with open(path, encoding="utf-8") as f:
-        spec = json.load(f)
+def normalise(spec):
     spec.setdefault("elements", spec.get("zones", []))
     for i, e in enumerate(spec["elements"], 1):
         e.setdefault("id", f"E{i}")
         e.setdefault("z", 0)
         e.setdefault("shape", "frame" if e.get("kind") == "overhead" and e.get("legs") else "box")
         r = e.get("repeat")
-        if r:   # the checked footprint of a row is its bounding box; the single piece is kept for drawing
+        if r and "piece" not in e:   # the checked footprint of a row is its bounding box; the single piece is kept for drawing
             r["_from"] = e.get("height", 0)
             e["piece"] = {"w": e["w"], "h": e["h"]}
             e["w"] = (r["count"] - 1) * abs(r.get("dx", 0)) + e["w"]
             e["h"] = (r["count"] - 1) * abs(r.get("dy", 0)) + e["h"]
             e["height"] = max(e.get("height", 0), r.get("height_to", e.get("height", 0)))
     return spec
+
+
+def load(path):
+    with open(path, encoding="utf-8") as f:
+        return normalise(json.load(f))
 
 
 def pieces(e):
@@ -105,7 +124,16 @@ def gap(a, b):
     return (dx * dx + dy * dy) ** 0.5, dx, dy
 
 
-def check(spec):
+def union(members):
+    """Bounding box of a group of floor pieces, checked as one piece against everything else."""
+    x0, y0 = min(b["x"] for b in members), min(b["y"] for b in members)
+    x1, y1 = max(b["x"] + b["w"] for b in members), max(b["y"] + b["h"] for b in members)
+    return {"id": f'group {members[0]["group"]}', "x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0,
+            "leg": all(b.get("leg") for b in members)}
+
+
+def problems(spec):
+    """Return (errors, warnings) for a spec; check() prints them."""
     W, D, H = spec["width"], spec["depth"], spec.get("max_height")
     k = unit_factor(spec)
     WALKWAY = spec.get("walkway", WALKWAY_M * k)
@@ -126,8 +154,9 @@ def check(spec):
                 errors.append(f"{name}: clear opening {clear:.2f} is below {HEADROOM} headroom")
         if e.get("shape") == "extrusion":
             prof = e.get("profile", [])
-            if prof and (max(p[0] for p in prof) > e["w"] + TOL or min(p[0] for p in prof) < -TOL):
-                errors.append(f"{name}: profile runs outside its width {e['w']}")
+            span, along = (e["w"], "width") if e.get("axis", "x") == "x" else (e["h"], "depth")
+            if prof and (max(p[0] for p in prof) > span + TOL or min(p[0] for p in prof) < -TOL):
+                errors.append(f"{name}: profile runs outside its {along} {span}")
             if prof and H and max(p[1] for p in prof) > H + TOL:
                 errors.append(f"{name}: profile rises above the {H} height limit")
         if e.get("kind") == "overhead" and e.get("shape") not in ("frame", "extrusion") and e["z"] < HEADROOM - TOL:
@@ -155,8 +184,12 @@ def check(spec):
         if e.get("shape") == "frame":
             band = e.get("band", 0.3)
             for side, lx in (("left leg", e["x"]), ("right leg", e["x"] + e["w"] - band)):
-                legs.append({"id": f'{e["id"]} {side}', "x": lx, "y": e["y"], "w": band, "h": e["h"], "leg": True})
-    for a, b in itertools.combinations(floor + legs, 2):
+                legs.append({"id": f'{e["id"]} {side}', "x": lx, "y": e["y"], "w": band, "h": e["h"], "leg": True,
+                             "group": e.get("group")})
+    bodies = [b for b in floor + legs if b.get("group") is None]
+    for g in dict.fromkeys(b["group"] for b in floor + legs if b.get("group") is not None):
+        bodies.append(union([b for b in floor + legs if b.get("group") == g]))
+    for a, b in itertools.combinations(bodies, 2):
         d, dx, dy = gap(a, b)
         if a.get("leg") or b.get("leg"):
             ox = min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"])
@@ -178,10 +211,17 @@ def check(spec):
     for item in spec.get("required", []):
         if item not in served:
             errors.append(f"required program item '{item}' is not served by any element")
-    used = sum(e["w"] * e["h"] for e in floor)
+    return errors, warnings
+
+
+def check(spec):
+    W, D, H = spec["width"], spec["depth"], spec.get("max_height")
+    k = unit_factor(spec)
+    errors, warnings = problems(spec)
+    used = sum(e["w"] * e["h"] for e in spec["elements"] if on_floor(e))
     print(f"GEOMETRY CHECK · {spec.get('title', '')} · {W} × {D}, max height {H}")
     print(f"Floor elements cover {used:.1f} of {W * D:.1f} ({used / (W * D):.0%}); "
-          f"walkway {WALKWAY:.2f}, headroom {HEADROOM:.2f} {spec.get('unit', 'm')}")
+          f"walkway {spec.get('walkway', WALKWAY_M * k):.2f}, headroom {spec.get('headroom', HEADROOM_M * k):.2f} {spec.get('unit', 'm')}")
     for m in errors:
         print("ERROR  ", m)
     for m in warnings:
@@ -190,10 +230,21 @@ def check(spec):
     return not errors
 
 
-# ---------- massing ----------
+def hints(spec):
+    """Print each element's render_hint, ready to paste into the image prompt."""
+    for e in spec["elements"]:
+        if e.get("render_hint"):
+            print(" ".join(f'{e["id"]} {e.get("label", "")}:'.split()), e["render_hint"])
+
+
+# ---------- massing: a white scaled model for the appendix ----------
+
+COLOURS = dict(bg="#F3F3F1", ground="#E9E9E6", plate="#F7F7F5", plate_edge="#9A9A96", wall="#FFFFFF",
+               body="#FFFFFF", hero="#DCE3EE", person="#BDBDB8", edge="#8E8E8A")
+
 
 def boxes(e):
-    """Return the element as a list of (x0, y0, z0, x1, y1, z1) boxes or a cylinder marker."""
+    """Return the element as a list of (x0, y0, z0, x1, y1, z1) boxes."""
     x, y, z, w, h = e["x"], e["y"], e["z"], e["w"], e["h"]
     t = e.get("height", 0.05)
     if e.get("shape") == "frame":
@@ -203,101 +254,249 @@ def boxes(e):
     return [(x, y, z, x + w, y + h, z + t)]
 
 
-def massing(spec, out):
+def box_faces(b):
+    x0, y0, z0, x1, y1, z1 = b
+    p = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+    idx = [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7), (0, 3, 2, 1)]
+    return [[p[i] for i in f] for f in idx]
+
+
+def cylinder_polys(e, n=28):
+    cx, cy = e["x"] + e["w"] / 2, e["y"] + e["h"] / 2
+    r, z0, z1 = e["w"] / 2, e["z"], e["z"] + e.get("height", 0.75)
+    a = [2 * math.pi * i / n for i in range(n + 1)]
+    ring = [(cx + r * math.cos(t), cy + r * math.sin(t)) for t in a]
+    side = [[(*ring[i], z0), (*ring[i + 1], z0), (*ring[i + 1], z1), (*ring[i], z1)] for i in range(n)]
+    return side + [[(*q, z1) for q in ring]] + [[(*q, z0) for q in ring]]
+
+
+def extrusion_polys(e):
+    """A profile [d, z] along the axis (x by default, or y), swept over the other size."""
+    prof, along_y = e.get("profile", []), e.get("axis", "x") == "y"
+
+    def pt(d, zz, s):
+        return (e["x"] + (s * e["w"] if along_y else d), e["y"] + (d if along_y else s * e["h"]), zz)
+
+    return [[pt(*p0, 0), pt(*p1, 0), pt(*p1, 1), pt(*p0, 1)] for p0, p1 in zip(prof, prof[1:])]
+
+
+def element_bodies(spec):
+    """Every drawable piece: (aabb, polygons, colour key, layer)."""
+    W, D = spec["width"], spec["depth"]
+    out = []
+    wall_h = spec.get("wall_height", 0)
+    for s, (x0, y0, x1, y1) in {"back": (0, 0, W, 0), "left": (0, 0, 0, D), "right": (W, 0, W, D)}.items():
+        if s not in spec.get("open_sides", []) and wall_h:
+            poly = [(x0, y0, 0), (x1, y1, 0), (x1, y1, wall_h), (x0, y0, wall_h)]
+            out.append(((min(x0, x1), min(y0, y1), 0, max(x0, x1), max(y0, y1), wall_h), [poly], "wall", -1))
+    for e in [p for el in spec["elements"] for p in pieces(el)]:
+        key = "hero" if e.get("kind") == "hero" or e.get("shape") == "frame" else "body"
+        layer = e.get("layer", 0)
+        if e.get("shape") == "cylinder":
+            out.append((boxes(e)[0], cylinder_polys(e), key, layer))
+        elif e.get("shape") == "extrusion":
+            zs = [p[1] for p in e.get("profile", [[0, 0]])] or [0]
+            out.append(((e["x"], e["y"], min(zs), e["x"] + e["w"], e["y"] + e["h"], max(zs)), extrusion_polys(e), key, layer))
+        else:
+            out += [(b, box_faces(b), key, layer) for b in boxes(e)]
+    return out
+
+
+def person_body(px, py, k, cam):
+    """A 1.75 m person for scale: a body and a head disc facing the camera."""
+    import numpy as np
+    n = 20
+    a = [2 * math.pi * i / n for i in range(n + 1)]
+    ring = [(px + 0.18 * k * math.cos(t), py + 0.12 * k * math.sin(t)) for t in a]
+    polys = [[(*ring[i], 0), (*ring[i + 1], 0), (*ring[i + 1], 1.5 * k), (*ring[i], 1.5 * k)] for i in range(n)]
+    polys.append([(*q, 1.5 * k) for q in ring])
+    c = np.array([px, py, 1.63 * k])
+    polys.append([tuple(c + 0.11 * k * (math.cos(t) * cam.r + math.sin(t) * cam.u)) for t in a])
+    return ((px - 0.18 * k, py - 0.12 * k, 0, px + 0.18 * k, py + 0.12 * k, 1.75 * k), polys, "person", 0)
+
+
+def paint_order(aabbs, eye):
+    """Back-to-front order for axis-aligned boxes seen from the point eye.
+
+    A may be painted before B when an axis-aligned plane separates them with the eye on B's side: every ray from
+    the eye to B stays on B's side, so A can never cover B. Exact for every non-intersecting pair; intersecting
+    boxes give no constraint and fall back to centre distance (use "layer" for those)."""
+    def clears(a, b):
+        return any((a[i + 3] <= b[i] + TOL and eye[i] >= a[i + 3] - TOL) or (b[i + 3] <= a[i] + TOL and eye[i] <= a[i] + TOL)
+                   for i in range(3))
+
+    before = [set() for _ in aabbs]
+    for i, j in itertools.combinations(range(len(aabbs)), 2):
+        ij, ji = clears(aabbs[i], aabbs[j]), clears(aabbs[j], aabbs[i])
+        if ij and not ji:
+            before[j].add(i)
+        elif ji and not ij:
+            before[i].add(j)
+    far = sorted(range(len(aabbs)), key=lambda i: -sum(((aabbs[i][d] + aabbs[i][d + 3]) / 2 - eye[d]) ** 2 for d in range(3)))
+    order = []
+    while far:
+        i = next((i for i in far if not before[i]), far[0])
+        order.append(i)
+        far.remove(i)
+        for s in before:
+            s.discard(i)
+    return order
+
+
+class Camera:
+    """A pinhole camera in stand coordinates: eye, target, 35 mm-equivalent lens, frame aspect (height / width).
+    Image coordinates: x from -1 (left edge) to 1 (right edge), y from -aspect (bottom) to aspect (top)."""
+
+    def __init__(self, eye, target, lens_mm, aspect):
+        import numpy as np
+        self.eye, self.target, self.lens, self.aspect = np.array(eye, float), np.array(target, float), lens_mm, aspect
+        f = self.target - self.eye
+        self.f = f / np.linalg.norm(f)
+        r = np.cross(np.array([0.0, 0.0, 1.0]), self.f)   # x grows to the right of the picture
+        self.r = r / np.linalg.norm(r)
+        self.u = np.cross(self.f, self.r)
+        self.tan = 18.0 / lens_mm      # half the 36 mm sensor over the focal length
+
+    def to_cam(self, pts):
+        import numpy as np
+        d = np.asarray(pts, float) - self.eye
+        return np.column_stack([d @ self.r, d @ self.u, d @ self.f])
+
+    def project(self, poly, near=0.08):
+        """Image coordinates of a polygon, clipped at the near plane (None if nothing is in front of the camera)."""
+        import numpy as np
+        pts = self.to_cam(poly)
+        out = []
+        n = len(pts)
+        for i in range(n):
+            a, b = pts[i], pts[(i + 1) % n]
+            ina, inb = a[2] >= near, b[2] >= near
+            if ina:
+                out.append(a)
+            if ina != inb:
+                t = (near - a[2]) / (b[2] - a[2])
+                out.append(a + t * (b - a))
+        if len(out) < 3:
+            return None
+        o = np.array(out)
+        return np.column_stack([o[:, 0] / o[:, 2] / self.tan, o[:, 1] / o[:, 2] / self.tan])
+
+    def pixels(self, pts, size):
+        """Pixel coordinates (u right, v down) of 3D points in front of the camera, for an image of size (w, h)."""
+        import numpy as np
+        P = self.to_cam(pts)
+        x, y = P[:, 0] / P[:, 2] / self.tan, P[:, 1] / P[:, 2] / self.tan
+        return np.column_stack([(x + 1) / 2 * size[0], (self.aspect - y) / (2 * self.aspect) * size[1]])
+
+
+def preset(spec, view, aspect, person_xy):
+    """Appendix cameras, fitted so the whole stand and the scale person fill about 86 % of the frame.
+    hero: eye level 1.6 m from the open front corner, 35 mm. front: eye level 1.6 m on the main aisle, 10 degrees off
+    the centre line, 35 mm. A spec may fix a camera: "camera": {"hero": {"eye": [x, y, z], "target": [x, y, z], "lens_mm": 35}}."""
+    import numpy as np
+    W, D, k = spec["width"], spec["depth"], unit_factor(spec)
+    top = max(e["z"] + e.get("height", 0) for e in spec["elements"])
+    right = spec.get("camera_corner", "right") == "right"
+    fixed = (spec.get("camera") or {}).get(view)
+    if fixed:
+        return Camera(fixed["eye"], fixed["target"], fixed.get("lens_mm", 35), aspect)
+    if view == "hero":
+        eye = ((W + 1.8 * k) if right else -1.8 * k, D + 2.4 * k, 1.6 * k)
+        target = ((0.55 * W) if right else 0.45 * W, 0.45 * D, 0.45 * top)
+    elif view == "front":
+        d, s = max(W, D) + 2 * k, (1 if right else -1)
+        eye = (W / 2 + s * d * math.sin(math.radians(10)), D + d * math.cos(math.radians(10)), 1.6 * k)
+        target = (W / 2, D / 2, min(1.6 * k, 0.45 * top))
+    else:
+        raise SystemExit(f"unknown view {view}: use hero or front")
+    # every vertex the frame must hold: the floor plate, each piece and the scale person
+    pts = [(x, y, 0) for x in (0, W) for y in (0, D)]
+    pts += [v for _, polys, _, _ in element_bodies(spec) for p in polys for v in p]
+    pts += [(person_xy[0] + sx, person_xy[1] + sy, z) for sx in (-0.2 * k, 0.2 * k) for sy in (-0.2 * k, 0.2 * k) for z in (0, 1.75 * k)]
+    pts = np.array(pts, float)
+    eye, target = np.array(eye, float), np.array(target, float)
+    for _ in range(10):
+        cam = Camera(eye, target, 35, aspect)
+        P = cam.to_cam(pts)
+        zc = np.maximum(P[:, 2], 0.5 * k)      # points beside or behind the camera count as huge: move back
+        X, Y = P[:, 0] / zc / cam.tan, P[:, 1] / zc / cam.tan
+        s = max((X.max() - X.min()) / 2 / 0.86, (Y.max() - Y.min()) / (2 * aspect) / 0.86)
+        horiz = eye - target
+        horiz[2] = 0
+        eye = target + horiz * s + np.array([0, 0, eye[2] - target[2]])
+        half = np.linalg.norm(target - eye) * cam.tan
+        target = target + (X.max() + X.min()) / 2 * half * cam.r + (Y.max() + Y.min()) / 2 * half * cam.u
+    return Camera(eye, target, 35, aspect)
+
+
+def draw_view(spec, view, size, path):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    import numpy as np
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    from matplotlib.collections import PolyCollection
 
-    W, D = spec["width"], spec["depth"]
-    k = unit_factor(spec)
-    top = max(e["z"] + e.get("height", 0) for e in spec["elements"])
+    W, D, k = spec["width"], spec["depth"], unit_factor(spec)
+    aspect = size[1] / size[0]
     right = spec.get("camera_corner", "right") == "right"
+    person_xy = {"hero": (0.25 * W if right else 0.75 * W, D + 0.6 * k),
+                 "front": ((W + 0.6 * k) if right else -0.6 * k, D + 0.3 * k)}[view]
+    cam = preset(spec, view, aspect, person_xy)
 
-    def faces(b):
-        x0, y0, z0, x1, y1, z1 = b
-        Y0, Y1 = D - y0, D - y1          # flip: back wall at Y = D, aisle at Y = 0, camera on the aisle side
-        p = [(x0, Y0, z0), (x1, Y0, z0), (x1, Y1, z0), (x0, Y1, z0),
-             (x0, Y0, z1), (x1, Y0, z1), (x1, Y1, z1), (x0, Y1, z1)]
-        idx = [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7)]
-        return [[p[i] for i in f] for f in idx]
+    fig = plt.figure(figsize=(size[0] / 100, size[1] / 100), dpi=100)
+    fig.patch.set_facecolor(COLOURS["bg"])
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(-aspect, aspect)
+    ax.axis("off")
 
-    def cylinder(e, n=28):
-        cx, cy = e["x"] + e["w"] / 2, D - (e["y"] + e["h"] / 2)
-        r, z0, z1 = e["w"] / 2, e["z"], e["z"] + e.get("height", 0.75)
-        a = np.linspace(0, 2 * np.pi, n + 1)
-        side = [[(cx + r * np.cos(a[i]), cy + r * np.sin(a[i]), z0), (cx + r * np.cos(a[i + 1]), cy + r * np.sin(a[i + 1]), z0),
-                 (cx + r * np.cos(a[i + 1]), cy + r * np.sin(a[i + 1]), z1), (cx + r * np.cos(a[i]), cy + r * np.sin(a[i]), z1)]
-                for i in range(n)]
-        lid = [[(cx + r * np.cos(t), cy + r * np.sin(t), z1) for t in a]]
-        return side + lid
+    def add(polys3d, face, edge, lw=0.5, z=1):
+        polys = [p for p in (cam.project(q) for q in polys3d) if p is not None]
+        if polys:
+            ax.add_collection(PolyCollection(polys, facecolors=face, edgecolors=edge, linewidths=lw, zorder=z))
 
-    views = {"hero": (8, -58 if right else -122), "front": (5, -90)}
-    for name, (elev, azim) in views.items():
-        fig = plt.figure(figsize=(12, 7.5), dpi=160)
-        ax = fig.add_subplot(projection="3d", computed_zorder=False)
-        ax.set_proj_type("persp", focal_length=1.4)
-        el, az = np.radians(elev), np.radians(azim)
-        cam = np.array([np.cos(el) * np.cos(az), np.cos(el) * np.sin(az), np.sin(el)])
-        centre = np.array([W / 2, D / 2, 1.0])
+    m = 40 * k
+    add([[(-m, -m, 0), (W + m, -m, 0), (W + m, D + m, 0), (-m, D + m, 0)]], COLOURS["ground"], "none", z=1)
+    add([[(0, 0, 0), (W, 0, 0), (W, D, 0), (0, D, 0)]], COLOURS["plate"], COLOURS["plate_edge"], lw=0.8, z=2)
+    bodies = element_bodies(spec) + [person_body(person_xy[0], person_xy[1], k, cam)]
+    order = []
+    for layer in sorted({b[3] for b in bodies}):
+        idx = [i for i, b in enumerate(bodies) if b[3] == layer]
+        order += [idx[j] for j in paint_order([bodies[i][0] for i in idx], cam.eye)]
+    for z, i in enumerate(order, start=10):
+        _, polys, key, _ = bodies[i]
+        faces = sorted(polys, key=lambda p: -sum((sum(v[d] for v in p) / len(p) - cam.eye[d]) ** 2 for d in range(3)))
+        add(faces, COLOURS[key], "none" if key == "person" else COLOURS["edge"], z=z)
+    fig.savefig(path, dpi=100, facecolor=COLOURS["bg"])
+    plt.close(fig)
 
-        def depth(poly):
-            return float(np.dot(np.mean(np.array(poly), axis=0) - centre, cam))
 
-        m = 2.0 * k
-        ax.add_collection3d(Poly3DCollection([[(-m, -m * 2.5, 0), (W + m, -m * 2.5, 0), (W + m, D + m, 0), (-m, D + m, 0)]],
-                                             facecolor="#E9E9E6", edgecolor="none", zorder=0))
-        ax.add_collection3d(Poly3DCollection([[(0, 0, 0), (W, 0, 0), (W, D, 0), (0, D, 0)]],
-                                             facecolor="#F7F7F5", edgecolor="#9A9A96", linewidths=0.8, zorder=1))
-        items = []
-        sides = {"back": [(0, D), (W, D)], "left": [(0, 0), (0, D)], "right": [(W, 0), (W, D)]}
-        wall_h = spec.get("wall_height", 0)
-        for s, ((ax0, ay0), (ax1, ay1)) in sides.items():
-            if s not in spec.get("open_sides", []) and wall_h:
-                items.append(([(ax0, ay0, 0), (ax1, ay1, 0), (ax1, ay1, wall_h), (ax0, ay0, wall_h)], "#FFFFFF", "#B5B5B0"))
-        for e in [p for el in spec["elements"] for p in pieces(el)]:
-            shade = "#DCE3EE" if e.get("kind") == "hero" or e.get("shape") == "frame" else "#FFFFFF"
-            if e.get("shape") == "cylinder":
-                polys = cylinder(e)
-            elif e.get("shape") == "extrusion":
-                prof = e.get("profile", [])
-                ya, yb = D - e["y"], D - (e["y"] + e["h"])
-                polys = [[(e["x"] + p0[0], ya, p0[1]), (e["x"] + p1[0], ya, p1[1]),
-                          (e["x"] + p1[0], yb, p1[1]), (e["x"] + p0[0], yb, p0[1])]
-                         for p0, p1 in zip(prof, prof[1:])]
-            else:
-                polys = [f for b in boxes(e) for f in faces(b)]
-            items += [(f, shade, "#8E8E8A") for f in polys]
-        # a 1.75 m person for scale, standing in the aisle
-        px, py = (W - 0.5 * k, -0.8 * k) if (right and name == "hero") else ((0.5 * k, -0.8 * k) if name == "hero" else (W / 2 + 1.4 * k, -0.9 * k))
-        a = np.linspace(0, 2 * np.pi, 20)
-        for i in range(19):
-            items.append(([(px + 0.18 * k * np.cos(a[i]), py + 0.12 * k * np.sin(a[i]), 0), (px + 0.18 * k * np.cos(a[i + 1]), py + 0.12 * k * np.sin(a[i + 1]), 0),
-                           (px + 0.18 * k * np.cos(a[i + 1]), py + 0.12 * k * np.sin(a[i + 1]), 1.5 * k), (px + 0.18 * k * np.cos(a[i]), py + 0.12 * k * np.sin(a[i]), 1.5 * k)],
-                          "#BDBDB8", "none"))
-        head = [(px + 0.11 * k * np.cos(t), py, 1.63 * k + 0.11 * k * np.sin(t)) for t in a]
-        items.append((head, "#BDBDB8", "none"))
-        for order, (poly, face, edge) in enumerate(sorted(items, key=lambda it: depth(it[0]))):
-            ax.add_collection3d(Poly3DCollection([poly], facecolor=face, edgecolor=edge, linewidths=0.5, zorder=2 + order))
-        ax.set_xlim(-0.8 * k, W + 0.8 * k)
-        ax.set_ylim(-1.6 * k, D + 0.4 * k)
-        ax.set_zlim(0, max(top, 3 * k) + 0.3 * k)
-        ax.set_box_aspect((W + 1.6 * k, D + 2.0 * k, max(top, 3 * k) + 0.3 * k))
-        ax.view_init(elev=elev, azim=azim)
-        ax.set_axis_off()
-        fig.patch.set_facecolor("#F3F3F1")
-        fig.savefig(f"{out}-{name}.png", bbox_inches="tight", facecolor="#F3F3F1", pad_inches=0.05)
-        plt.close(fig)
-    print(f"Massing views written: {out}-hero.png, {out}-front.png")
+def massing(spec, out, views=("hero", "front"), size=(1536, 1024)):
+    for view in views:
+        draw_view(spec, view, size, f"{out}-{view}.png")
+    print("Massing views written: " + ", ".join(f"{out}-{v}.png" for v in views))
+
+
+def main(argv=None):
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # Windows consoles choke on × and ·
+    ap = argparse.ArgumentParser(description="Booth geometry: check, massing, hints")
+    ap.add_argument("cmd", choices=["check", "massing", "hints"])
+    ap.add_argument("spec")
+    ap.add_argument("out", nargs="?", help="massing: output basename")
+    ap.add_argument("--views", default="hero,front", help="massing: hero, front or both")
+    ap.add_argument("--size", default="1536x1024", help="massing: image size in pixels, WxH")
+    a = ap.parse_args(argv)
+    spec = load(a.spec)
+    if a.cmd == "check":
+        sys.exit(0 if check(spec) else 1)
+    if a.cmd == "hints":
+        hints(spec)
+        return
+    if not a.out:
+        sys.exit("massing needs an output basename")
+    massing(spec, a.out, [v.strip() for v in a.views.split(",") if v.strip()],
+            tuple(int(v) for v in a.size.lower().split("x")))
 
 
 if __name__ == "__main__":
-    cmd, path = sys.argv[1], sys.argv[2]
-    s = load(path)
-    if cmd == "check":
-        sys.exit(0 if check(s) else 1)
-    elif cmd == "massing":
-        massing(s, sys.argv[3])
-    else:
-        sys.exit("usage: booth_geometry.py check|massing spec.json [out_basename]")
+    main()

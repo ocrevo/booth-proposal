@@ -4,4 +4,4 @@ focus: trace
 weight: 1
 ---
 
-The final geometry check passes and massing images are produced.
+The final geometry check passes before any image prompt is written.

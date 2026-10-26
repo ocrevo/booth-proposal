@@ -100,17 +100,45 @@ Read the RFP; 6 assumptions, 2 of them high impact: the front is the main aisle,
 
 **Atmosphere.** Brushed aluminium fins over a matte Halvard-green wall; white solid-surface vitrine, bench and counter; light grazing the fins from below so the curve glows. Halvard Green #0F4D3A · white #F7F7F4 · brushed aluminium #C8CACC · 3500 K.
 
-Plan: halvard-plan-A.png · Massing: halvard-massing-A-hero.png, halvard-massing-A-front.png
+**Signature detail.** Each fin stands on a 1 cm shadow gap and carries its year laser-engraved at eye height. **Supporting system** (architectural): pale grey microcement floor, steel-framed chairs with grey leather seats at a honed stone table, white solid-surface vitrine, bench and counter. **Intensity:** restrained – one material, one colour, one gesture.
+
+Plan: halvard-plan-A.png · Massing (appendix): halvard-massing-A-hero.png, halvard-massing-A-front.png
 
 **Creative director's note.** Clear, ownable and calm. The risk: fins can read as an ordinary slatted wall, so the even curve and the engraved years must be crisp.
 
 ## B · The Calibration Room
 **Where nothing is left to chance.**
-A softly glowing translucent room, like a clean room drawn in light, holds the meeting table; instruments outside it stand in precise pools of light on a dark green floor. *Note: the strongest atmosphere, the hardest to build in 4 days.*
+
+**The idea.** In a laboratory, the calmest room is the one where measurements are made. A translucent room of tensioned white fabric, lit from within, stands in the stand like a clean room drawn in light, with the meeting table inside. Outside it, the three instruments stand on dark green plinths, each in its own precise pool of light.
+
+**The experience.**
+- At 10 m: one softly glowing white volume in a dark green stand.
+- At 3 m: the instruments, each lit like a specimen.
+- Inside: a quiet table in diffuse white light; the noise of the hall seems to drop.
+- Photo moment: a visitor's silhouette seen through the glowing wall.
+
+**What it says.** "Precision you can trust." · Calibrated by hand since 1952 · in labs in 40+ countries.
+
+**Atmosphere.** Glowing white fabric against dark Halvard-green floor and plinths; warm 3000 K pools on the instruments. **Signature detail:** the fabric is stretched on a frame so thin it disappears, the room's corners perfectly sharp. **Supporting system** (light and atmosphere): dark green resin floor, low chairs upholstered in grey wool, a counter that glows like the room. **Intensity:** expressive – a dark stand and one glowing volume.
+
+**Creative director's note.** The strongest atmosphere. The risk: it is the hardest to build in four days, and the room must never read as a tent.
 
 ## C · Green Stone
 **Made by hand, measured to the microgram.**
-Every surface people touch is honed Halvard-green stone: a monolithic counter, a demo bench, plinths into which the instruments are set like jewels, with one engraved line on each. *Note: the most tactile and ownable; heavy, so the floor load must be checked.*
+
+**The idea.** Halvard calibrates every balance by hand. The stand is made the same way: every surface people touch is honed Halvard-green stone, worked like an instrument, with the instruments set into it like jewels.
+
+**The experience.**
+- At 10 m: a calm, monolithic landscape of green stone volumes.
+- At 3 m: each instrument set into its own stone plinth, with one engraved line beside it.
+- Inside: a stone counter and a stone table, cool to the touch.
+- Photo moment: a hand resting on the stone beside the A75 balance.
+
+**What it says.** "Precision you can trust." · Every balance calibrated by hand · 1952.
+
+**Atmosphere.** Honed green stone with fine pale veins, a warm limestone floor, warm 3000 K pools that show the stone's texture. **Signature detail:** the single engraved line on each plinth is filled with brushed brass. **Supporting system** (material and craft): limestone floor, solid walnut stools, a counter cut from the same stone. **Intensity:** balanced – one rich material, quiet everywhere else.
+
+**Creative director's note.** The most tactile and ownable. The risk: weight – check the floor load, or use a stone veneer on a light core.
 
 | | A · Seventy-Five | B · Calibration Room | C · Green Stone |
 | --- | --- | --- | --- |
@@ -119,28 +147,21 @@ Every surface people touch is honed Halvard-green stone: a monolithic counter, a
 | Territory | Architectural | Light and atmosphere | Material and craft |
 | Main risk | Reads as a slatted wall | Build time | Weight |
 
-### Prompts for concept A (View 1 on halvard-massing-A-hero.png)
+### Prompt for concept A (View 1; the client's previous-stand photos attached as references)
 
 ```
-FIXED GEOMETRY – follow exactly; it overrides everything below.
-Use the attached white massing model as the exact geometry, proportions, positions and camera. Keep every element where it is and at the size shown; add only materials, colour, light, graphics and people.
-Stand: exactly 6.0 m wide × 4.0 m deep, open on the front (main aisle) and the right side; nothing extends beyond this footprint – no extra depth, no rear room, nothing in the aisle.
-Tallest element: 4.2 m. Scale: people about 1.75 m tall, counter 1.05 m, tables 0.75 m.
-If something does not fit, simplify it; never enlarge the stand or shrink furniture to implausible sizes.
-One photograph of this one stand only: no collage, no presentation board, no captions.
-Seventy-five fine metal fins rise in one perfectly even curve above a calm green wall, catching the light like the scale of a precision instrument.
-Award-level exhibition design for Halvard Instruments, a maker of laboratory instruments, at a trade fair: concept "Seventy-Five" – seventy-five years, one line of precision.
-Hero: 75 slender brushed-aluminium fins along the back wall, one for every year since 1952, their heights rising evenly from 1.2 m to 4.2 m; light grazing them from below so the curve glows.
-Supporting, kept quiet: a long white vitrine holding three laboratory instruments; a white demo bench facing the aisle; a white coffee counter on the right edge.
-Palette: Halvard Green #0F4D3A on the back wall behind the fins, white #F7F7F4, brushed aluminium #C8CACC. Materials: brushed aluminium, matte lacquer, white solid surface, light grey floor. Light: grazing light on the fins, soft even light elsewhere, 3500 K.
-Brand: one clean panel with the letters "HALVARD" on the storage block; no other text.
-Camera: as in the massing image – eye level 1.6 m in the main aisle at the right front corner, three-quarter view, 35 mm, verticals corrected; the hero dominates, the whole stand and both open sides visible.
-Photography: editorial architectural photography, soft natural-looking light, true-to-life materials, subtle depth of field, two or three visitors in motion for scale.
-Setting: calm neutral exhibition hall, no other brands visible.
-Avoid: LED strip outlines, neon, RGB light, gradients, lens flare, glowing text, high-gloss plastic, multiple slogans, decorative swooshes, roll-up banners, clutter, generic white-and-oak minimalism, fisheye distortion, cartoon or game-engine look.
+A stunning, high-end exhibition stand design visualization for Halvard Instruments, a maker of laboratory balances, pipetting systems and liquid handlers since 1952, at LabWorld Europe 2027.
+
+Idea – "Seventy-Five": 75 slender brushed-aluminium fins, one for every year since 1952, rise in one perfectly even curve from 1.2 m to 4.2 m along the back of the stand, over a Halvard-green wall – seventy-five years, one line of precision.
+
+Make it look premium and memorable. Brand colours: Halvard Green #0F4D3A and white.
+Essentials: 6 m wide × 4 m deep corner stand on a low platform, open at the front and the right side; a storage block with a 75-inch screen, a long vitrine with three instruments, a demo bench facing the aisle, a coffee counter, a meeting table for four. The letters "HALVARD" once; no other text. No ceiling, nothing hung from the hall ceiling. A few visitors for scale.
+The attached photos show Halvard's previous stand: use them for the brand feel, the finish and the level of polish to aim for, then design a new stand; do not copy its layout.
 ```
 
-View 2 uses the same fixed-geometry block with the front massing image and View 1 attached, then: "Same exhibition stand as in the attached View 1 … Camera: eye level about 1.6 m on the stand's centre line, facing the front straight on … Elements to keep visible: the 75 fins, the HALVARD panel, the vitrine, the demo bench, the coffee counter, the meeting table."
+View 2 is an edit of the chosen View 1 with the View 2 template (references/image-prompts.md); keep visible: the 75 fins, the HALVARD panel, the vitrine, the demo bench, the coffee counter, the meeting table.
+
+Size check of each render, by eye with the people as the scale: front edge about 3.5 person-heights; front edge to back wall about 2.3; the tallest fin about 2.4 times a person; open on the front and right; nothing hung, no extra room. If the stand is drawn too deep, fix it with one sentence: "The stand is too deep: it is only 4 m, about two and a quarter person-heights from the front edge to the back wall. Bring the back wall forward; keep every design element."
 
 ---
 
