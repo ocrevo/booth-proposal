@@ -508,6 +508,42 @@ def test_d_txt_internal(fresh, capsys):
     assert hit(zh, "D-TXT-INTERNAL", "id:")
 
 
+def test_text_checks_at_element_edges(fresh):
+    """Terms sitting at the edge of two inline elements are not run together by the text extraction."""
+    root = fresh()
+
+    def got(markup, code, rule):
+        say(root, "a-board", "para", markup)
+        return hit(root, code, rule)
+
+    assert got("<span>Tasting bar harbour</span><span>D2</span>", "D-TXT-INTERNAL", "id:")
+    assert got("<span>D2</span><span>harbour</span>", "D-TXT-INTERNAL", "id:")
+    assert got("<b>Harbour view</b><i>D2</i>", "D-TXT-INTERNAL", "id:")
+    assert got("<span>See</span><span>set-1</span>", "D-TXT-INTERNAL", "set")
+    assert got("<span>Work in</span><span>TODO</span>", "D-TXT-INTERNAL", "todo")
+    assert got("<span>the old</span><span>stand</span>", "D-TXT-REFERENCE", "phrase")
+    assert got("<a>the previous</a><a>stand</a>", "D-TXT-REFERENCE", "phrase")
+    assert got("<span>It</span><span>builds on</span><span>the quay</span>", "D-TXT-PENDING", "evolution")
+    # a typographic tag inside one word does not split it; block and other tags do
+    assert not got("Tide<b>water</b> lounge", "D-TXT-REFERENCE", "phrase")
+    vis = deck_html.visible_text(deck_html.parse("<section>Tide<b>water</b>s <em>a</em><em>b</em> x<a>y</a>z</section>"))
+    assert vis.splitlines()[0].split() == ["Tidewaters", "a", "b", "x", "y", "z"]
+    say(root, "a-board", "para", "Open timber lounge")
+    assert not codes(root) & {"D-TXT-INTERNAL", "D-TXT-REFERENCE"}
+
+
+@pytest.mark.parametrize("lang", ["en", "zh"])
+def test_reference_phrases_flagged(fresh, lang):
+    root = fresh(lang)
+    phrases = json.loads((SCRIPTS.parent / "assets" / "labels" / f"{lang}.json").read_text(encoding="utf-8"))["reference_phrases"]
+    assert len(phrases) >= 6
+    wanted = ["old stand", "previous booth", "last year's booth", "current stand", "existing stand"] if lang == "en"         else ["旧展位", "之前的展台", "现有展台", "当前展台", "上次展台"]
+    assert set(wanted) <= set(phrases)
+    for phrase in phrases:
+        say(root, "a-board", "para", f"Unlike the {phrase} here" if lang == "en" else f"不同于{phrase}的做法")
+        assert hit(root, "D-TXT-REFERENCE", "phrase"), phrase
+
+
 # ---------- D-TXT-REFERENCE ----------
 
 def test_d_txt_reference(fresh):

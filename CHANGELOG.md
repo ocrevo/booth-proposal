@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.6.0 – 2026-10-28
+
+- Reference sets and free selection: references live in `input/refs/<set>/`, each set gets its own candidate concepts, and the user chooses which concepts to develop with `gates.py select`. `start` stops once, after the candidate boards and the overview, to wait for that choice; `step mode` stops after every step.
+- `brief.json` is the single source for the brief and frame; `scripts/gates.py` (brief, frame, ideas, select, renders, concepts, report) checks each stage with one error code per kind of problem, grouped in families.
+- Hero render only: two candidates per concept, one chosen; corrections are limited by the `fix_max` threshold. Front and detail views are no longer part of the default flow.
+- Free, short prompts, with `render.py lint` checking the prompt before any call.
+- Image review with typed marks, a size gate and a premium gate (`render.py review`, `render.py sheet`); the logo is composited from the real file (`render.py logo`) and inherits the review of its base image.
+- Sidecar v2 with a base chain; `render.py import` brings in an image made in ChatGPT or Claude.ai and records where it came from.
+- The proposal is a single HTML file: `deck.py layouts --emit` gives the building blocks, `check` is read-only, `render` measures overflow and upscale, two review passes are recorded with `review --record`, and `export` is gated.
+- `pack/` holds only `proposal.html`, `proposal.pdf` and `site.svg`; every other generated file goes to `work/`.
+- Geometry: error and warning codes, a `facts` command, the envelope check with a reasoned override, and argparse-based `draw_plan.py`.
+- Thresholds and report labels are named values; the labels live in `assets/labels/`.
+- Docs reorganised into one reference per step (`1-brief.md`, `2-frame.md`, `3-ideas.md`, `4-renders.md`, `5-develop.md`, `6-proposal.md`) plus `review.md`; the README is rewritten in Chinese.
+- New: tests for docs, scripts and release; rewritten evals with fictional inputs; the client-term scanner `tools/scan_client_terms.py`; the eval grader `tools/eval_grade.py`; the deterministic build `tools/build_dist.py` (the `dist/` file is byte-identical across builds and leaves out `evals/`).
+- Removed: the page generators and the fixed page plan, scraping of `concept.md` text, style-card and design-points parsing, the rule that at least one concept must not come from the references, the intensity and supporting-system tables, massing images in the proposal, `pack/check.txt`, `pack/preview/`, and the worked example.
+
 ## 0.5.0 – 2026-10-26
 
 - New order: Brief → Frame → Ideas → Visualise → Develop → Pitch pack. Fast start: View 1 renders come right after the three ideas are chosen, within minutes; geometry, plan, content map and concept text follow and stay true to the chosen image. If the geometry check fails, the design changes and is re-rendered.

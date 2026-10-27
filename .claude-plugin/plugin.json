@@ -1,7 +1,7 @@
 {
   "name": "booth-proposal",
-  "version": "0.5.0",
-  "description": "A design-first studio partner for exhibition booth proposals: brief, frame, ideas, renders from the client's own references checked by eye against the real size, geometry-checked plans and a pitch pack",
+  "version": "0.6.0",
+  "description": "A design-first studio partner for exhibition booth proposals: reference sets, several concepts per set with reviewed hero renders, geometry-checked plans for the concepts the user selects, and an HTML proposal exported to PDF",
   "author": {
     "name": "ocrevo"
   },

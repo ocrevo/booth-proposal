@@ -1,6 +1,6 @@
 interface:
   display_name: "Booth Proposal"
-  short_description: "Turn a booth RFP and reference photos into three booth concepts"
+  short_description: "Turn a booth RFP and reference photos into booth concepts and a proposal"
   default_prompt: "Use the booth-proposal skill. I have uploaded the RFP and reference images. start"
 
 policy:

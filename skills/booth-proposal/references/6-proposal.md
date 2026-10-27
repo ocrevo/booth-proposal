@@ -77,7 +77,7 @@ Plans sit in the concept chapters; massing never appears.
 5. `deck.py check` (read-only; `deck.py check --json` also writes `work/check.json` for `status`). Fix every error; read warnings and pending items.
 6. `deck.py render`: refreshes page references, prints check counts (it renders even with errors), writes `work/proposal-draft.pdf`, `work/preview/slide-NN.png`, `work/contact.png` and `work/render.json` (overflow, upscale). Look at the contact sheet, then each overflowing page and every board at full size for crops cutting the hero, empty bands, repeated pages, text contradicting the image.
 7. Repeat 5–6 until no errors and zero overflow; after at most three fix rounds, report what is still open to the user, never on a slide.
-8. Pass 1 and Pass 2 (review.md), then `deck.py review --record work/deck-review.input.json`.
+8. Pass 1 and Pass 2 (review.md), then `deck.py review --record work/deck-review.input.json`; if `deck.py check` then reports D-REF `stale` (page references moved), run `deck.py render` again.
 9. `deck.py export`.
 
 After a later change: `deck.py text --diff`, review those pages, record, export.

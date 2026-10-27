@@ -568,13 +568,23 @@ def page_text(slide) -> str:
     return "\n".join(page_lines(slide))
 
 
+_TYPO = ("b", "i", "em", "strong", "span", "sup", "sub")
+
+
 def visible_text(slide) -> str:
     """Client-visible text of a slide: text nodes outside script, style and template with data-ref subtrees
-    skipped (joined as Node.text does), then every alt and title value."""
+    skipped, then every alt and title value. Every element boundary is a word boundary, so terms at the edge of
+    two elements are not run together; only the typographic inline tags (b i em strong span sup sub) join to
+    adjacent text with no space, as in <b>x</b>y, and still separate from an adjacent element."""
     out, extra = [], []
 
+    def sep():
+        if out and not out[-1][-1:].isspace():
+            out.append(" ")
+
     def walk(n):
-        for c in n.children:
+        kids = n.children
+        for i, c in enumerate(kids):
             if c.tag == "#text":
                 out.append(html.unescape(c.raw))
             elif c.is_el and c.tag not in _SKIP and c.get("data-ref") is None:
@@ -582,9 +592,12 @@ def visible_text(slide) -> str:
                     v = c.get(a)
                     if v:
                         extra.append(html.unescape(v))
+                typo = c.tag in _TYPO and c.tag not in _BLOCK
+                if not typo or (i > 0 and kids[i - 1].is_el):
+                    sep()
                 walk(c)
-                if c.tag in _BLOCK:
-                    out.append(" ")
+                if not typo or c.tag in _BLOCK or (i + 1 < len(kids) and kids[i + 1].is_el):
+                    sep()
     walk(slide)
     for a in ("alt", "title"):
         if slide.get(a):
