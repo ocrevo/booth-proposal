@@ -1,10 +1,10 @@
-"""gates.py report brief|ideas."""
+"""gates.py report brief|ideas (report renders: test_gates_renders.py)."""
 import pytest
 
 import common
 
 
-@pytest.mark.parametrize("case", ["brief_zh", "brief_en", "ideas_en", "out_file", "unknown_lang", "renders"])
+@pytest.mark.parametrize("case", ["brief_zh", "brief_en", "ideas_en", "out_file", "unknown_lang"])
 def test_report(make_project, run_gates, tmp_path, case):
     if case in ("brief_zh", "brief_en"):
         lang = case.split("_")[1]
@@ -37,7 +37,3 @@ def test_report(make_project, run_gates, tmp_path, case):
         common.write_json(str(root / "brief" / "brief.json"), brief)
         code, out, err = run_gates(root, "report", "brief")
         assert code == 2 and "C-INPUT" in err
-    elif case == "renders":
-        root = make_project(renders=False)
-        code, out, err = run_gates(root, "report", "renders")
-        assert code == 2

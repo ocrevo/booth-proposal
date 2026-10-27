@@ -130,9 +130,8 @@ def _hero_prompt(name: str, idea: str) -> str:
 
 
 def _render_hero(root, concept_key: str, prompt_rel: str, refs: list[str]) -> None:
-    """Write hero-v1/v2 through the real render.generate -> call -> save with the network replaced."""
-    renders_rel = f"concepts/{concept_key}/renders"
-    argv = ["hero", "--prompt", prompt_rel, "--out-dir", renders_rel, "--n", "2"]
+    """Write hero-v1/v2 through the real render.py hero (lint, call, save) with the network replaced."""
+    argv = ["hero", "--concept", concept_key, "--prompt", prompt_rel, "--n", "2"]
     for r in refs:
         argv += ["--ref", r]
 
@@ -144,7 +143,72 @@ def _render_hero(root, concept_key: str, prompt_rel: str, refs: list[str]) -> No
             mock.patch("urllib.request.urlopen", side_effect=no_network), \
             mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test-key-not-real"}), \
             contextlib.redirect_stdout(io.StringIO()):
-        render.main(argv)
+        code = render.main(argv)
+    assert code == 0, f"render.py hero failed for {concept_key}"
+
+
+def review_pass(root, image_rel: str, scope: str = "full") -> None:
+    """Record a passing review of an image through render.py review (needs the review command)."""
+    argv = ["review", image_rel, "--reviewer", "subagent", "--verdict", "pass", "--premium", "yes",
+            "--scope", scope, "--size-json", '{"observed": {"w": 4.6, "d": 3.4, "h": 2.6}}', "--marks-json", "[]",
+            "--project", str(root)]
+    with contextlib.chdir(root), contextlib.redirect_stdout(io.StringIO()):
+        code = render.main(argv)
+    assert code == 0, f"render.py review failed for {image_rel}"
+
+
+def hero_ok() -> str:
+    """A hero prompt that passes lint: the template filled for Tidal Gate, with the shipped fixed sentences."""
+    import json
+    fixed = json.loads((SCRIPTS.parent / "assets" / "prompts" / "fixed.json").read_text(encoding="utf-8"))
+    return HERO_OK_TEMPLATE.format(**fixed)
+
+
+HERO_OK_TEMPLATE = """Idea – Tidal Gate: one deep gate of folded ribs that visitors walk through into a calm lounge; the gate carries the counter and a large screen.
+
+Brand colours: deep navy #0B3D5C, signal yellow #F2B705, white
+
+Size:
+- One platform about four and a half person-heights wide and three and a half person-heights deep; the whole stand, the gate included, stands on it and nothing stands outside it.
+- Open at the front and the right side; the other sides are closed.
+- The tallest element, the gate, is about 2.6 times the height of a person.
+
+Essentials: the gate carries the counter and a large screen; a lounge with low seats, three plain product plinths, storage as a door in the back wall. No ceiling and nothing hung from the hall ceiling. A few visitors for scale, one at the front edge.
+{logo_panel}
+{no_lettering}
+
+{reference}
+{do_not_copy}
+"""
+
+
+def put_sidecar(root, image_rel: str, mode: str, *, base: str | None = None, refs=(), version: int = 2) -> None:
+    """Write a sidecar beside concepts/<set>/<concept>/renders/<name>. version 2 = sidecar/2 (hashes read from
+    the files now), 1 = the old key-less sidecar. base/refs are project-relative paths."""
+    root = Path(root)
+    parts = image_rel.split("/")
+    image = str(root / image_rel)
+    if version == 1:
+        common.write_json(common.sidecar_path(image), {
+            "image": parts[-1], "timestamp": "2026-01-01T00:00:00", "mode": mode,
+            "input_images": [*([base] if base else []), *refs]})
+        return
+    inputs = [{"role": "ref", "path": r, "sha256": common.sha256_file(str(root / r))} for r in refs]
+    if base:
+        inputs.append({"role": "base", "path": base, "sha256": common.sha256_file(str(root / base))})
+    common.write_sidecar(image, {"tool": "render.py", "mode": mode, "set": parts[1], "concept": parts[2],
+                                 "inputs": inputs, "prompt_sha256": None, "lint": None, "api": None})
+
+
+def add_render(root, key: str, name: str, *, mode: str = "hero", base: str | None = None, refs=(),
+               version: int | None = 2, data: bytes | None = None) -> str:
+    """Write a new image concepts/<key>/renders/<name> (a fresh colour unless data is given) and, when version
+    is 1 or 2, its sidecar. Returns the project-relative path."""
+    rel = f"concepts/{key}/renders/{name}"
+    _write(Path(root) / rel, data if data is not None else png_bytes(_next_rgb()))
+    if version:
+        put_sidecar(root, rel, mode, base=base, refs=refs, version=version)
+    return rel
 
 
 def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaffold=True,

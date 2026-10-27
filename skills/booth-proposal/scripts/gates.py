@@ -1,6 +1,6 @@
 """Gates for the early steps of a booth proposal project.
 
-Commands: brief [--stamp], frame, ideas [--scaffold], select, report brief|ideas.
+Commands: brief [--stamp], frame, ideas [--scaffold], select, renders, report brief|ideas|renders.
 Every command takes --project (default "."), written after the command name.
 Exit codes: 0 done, 1 at least one error finding, 2 bad invocation or unusable input.
 Messages are English and start with the rule name ("stale: ..."); only `report` prints text in
@@ -17,9 +17,10 @@ import os
 import re
 import sys
 
-from common import (Finding, InputError, _CONCEPT_ID_RE, _LEGACY_SET, _SET_ID_RE, concept_ref, list_concepts,
-                    load_labels, now_iso, print_findings, read_front_matter, read_json, scan_reference_sets,
-                    write_json, find_project)
+from common import (Finding, InputError, _CONCEPT_ID_RE, _LEGACY_SET, _SET_ID_RE, _images_in, concept_ref,
+                    list_concepts, load_labels, now_iso, print_findings, read_front_matter, read_json, read_review,
+                    read_sidecar, real, review_is_current_pass, scan_reference_sets, sha256_file, sidecar_version,
+                    trace_base_chain, write_json, find_project)
 
 _BRIEF = "brief/brief.json"
 _IDEAS = "brief/ideas.json"
@@ -80,6 +81,11 @@ def _stale(project, disk_sets: list[dict]) -> list[Finding]:
             elif old[path] != new[path]:
                 out.append(Finding("G-REFS", "error", path, f"stale: file changed since the stamp; {fix}"))
     return out
+
+
+def _reference_findings(project, disk_sets: list[dict], scan: list[Finding]) -> list[Finding]:
+    """The reference-set findings shared by `brief` and `renders`: scan findings (G-REFS, C-LEGACY) + stale."""
+    return scan + _stale(project, disk_sets)
 
 
 # ---------- brief ----------
@@ -170,7 +176,7 @@ def cmd_brief(project, args) -> int:
         if not args.json:
             n = sum(len(s["files"]) for s in disk_sets)
             print(f"stamped {len(disk_sets)} set(s), {n} file(s) into {_BRIEF}")
-    findings = _brief_problems(project) + scan + _stale(project, disk_sets)
+    findings = _brief_problems(project) + _reference_findings(project, disk_sets, scan)
     return print_findings(findings, args.json)
 
 
@@ -398,6 +404,103 @@ def cmd_select(project, args) -> int:
     return 0
 
 
+# ---------- renders ----------
+
+def _own_set_hashes(project, set_id: str) -> set[str]:
+    """The stamped sha256 values of the reference set a concept belongs to (empty when not stamped)."""
+    refs = project.brief.get("references")
+    if not _refs_shape_ok(refs):
+        return set()
+    return {f["sha256"] for s in refs["sets"] if s["id"] == set_id for f in s["files"]}
+
+
+def _chain_ref_hashes(project, chain: list[str]) -> list[tuple[str, str, str]]:
+    """(chain step, ref path, sha256) of every reference input along a base chain. A v2 sidecar records the
+    hash; an old sidecar lists input_images, hashed now (files under concepts/ are bases, not references)."""
+    out: list[tuple[str, str, str]] = []
+    for step in chain:
+        sc = read_sidecar(project.path(step))
+        ver = sidecar_version(sc)
+        if ver == 2:
+            inputs = sc.get("inputs")
+            for i in inputs if isinstance(inputs, list) else []:
+                if isinstance(i, dict) and i.get("role") == "ref" and isinstance(i.get("sha256"), str):
+                    out.append((step, str(i.get("path", "")), i["sha256"]))
+        elif ver == 1:
+            imgs = sc.get("input_images")
+            for p in imgs if isinstance(imgs, list) else []:
+                if not isinstance(p, str):
+                    continue
+                p = p.replace("\\", "/")
+                if p.startswith("concepts/"):
+                    continue
+                try:
+                    out.append((step, p, sha256_file(os.path.join(project.root, p))))
+                except OSError:
+                    continue
+    return out
+
+
+def _concept_render_findings(project, c) -> list[Finding]:
+    """G-FM, G-RENDER, G-REVIEW, R-FIX-MAX and C-LEGACY for one concept folder."""
+    fm, fm_findings = read_front_matter(c)
+    if fm_findings:
+        return fm_findings
+    if not _images_in(os.path.join(c.dir, "renders")):
+        return []
+    md = f"concepts/{c.set}/{c.id}/concept.md"
+    if fm["chosen"] is None:
+        return [Finding("G-RENDER", "error", md, "nochosen: the concept has renders but concept.md names no chosen one")]
+    image = os.path.normpath(os.path.join(c.dir, fm["chosen"]))
+    rel = project.rel(image)
+    out: list[Finding] = []
+
+    def add(code: str, level: str, message: str, where: str = rel) -> None:
+        out.append(Finding(code, level, where, message))
+
+    if real(image) in {real(os.path.join(c.dir, b)) for b in fm["blocked"]}:
+        add("G-RENDER", "error", "blocked: the chosen render is also listed as blocked in concept.md")
+    sc = read_sidecar(image)
+    ver = sidecar_version(sc)
+    outputs = sc.get("outputs") if ver == 2 else None
+    if ver == 0:
+        add("G-RENDER", "error", "sidecar: the chosen render has no usable sidecar; re-render or re-import")
+    elif ver == 2 and not (isinstance(outputs, dict) and outputs.get(os.path.basename(image)) == sha256_file(image)):
+        add("G-RENDER", "error", "sidecar: image changed after it was written; re-render or re-import")
+    else:
+        chain, finding = trace_base_chain(project, image)
+        if finding is not None:
+            out.append(finding._replace(code="G-RENDER"))
+        else:
+            own = _own_set_hashes(project, c.set)
+            seen: set = set()
+            for step, path, digest in _chain_ref_hashes(project, chain):
+                if digest not in own and digest not in seen:
+                    seen.add(digest)
+                    add("G-RENDER", "error",
+                        f"refset: reference input {path or digest[:12]} is not a photo of set {c.set}", step)
+            fixes = sum(1 for step in chain if (read_sidecar(project.path(step)) or {}).get("mode") == "fix")
+            fix_max = project.thresholds["fix_max"]
+            if fixes > fix_max:
+                add("R-FIX-MAX", "warn",
+                    f"fix-max: the base chain has {fixes} fixes (fix_max {fix_max}); a new hero may serve better")
+            if sidecar_version(read_sidecar(project.path(chain[-1]))) == 1:
+                add("C-LEGACY", "warn", "legacy: the base chain ends at an image with an old sidecar", chain[-1])
+    ok, reason = review_is_current_pass(image, True)
+    if not ok:
+        add("G-REVIEW", "error", reason)
+    return out
+
+
+def cmd_renders(project, args) -> int:
+    keys = list(dict.fromkeys(k for group in (args.concept or []) for k in group))
+    concepts = [concept_ref(project, k) for k in keys] if keys else list_concepts(project)
+    findings = _reference_findings(project, *scan_reference_sets(project))
+    for c in concepts:
+        findings += _concept_render_findings(project, c)
+    return print_findings(findings, args.json)
+
+
 # ---------- report ----------
 
 def _cell(v) -> str:
@@ -457,9 +560,41 @@ def _report_ideas(project, L: dict) -> list[str]:
     return lines
 
 
+def _report_renders(project, L: dict) -> list[str]:
+    import render      # renders_of: the candidate images of a concept (stdlib only at import time)
+    none = L["none"]
+    lines = [f"# {L['renders']}"]
+    by_set: dict = {}
+    for c in list_concepts(project):
+        by_set.setdefault(c.set, []).append(c)
+    for sid, concepts in by_set.items():
+        rows = []
+        for c in concepts:
+            fm, _ = read_front_matter(c)
+            chosen = real(os.path.join(c.dir, fm["chosen"])) if fm["chosen"] else None
+            images = list(render.renders_of(c))
+            if chosen is not None and os.path.isfile(chosen) and chosen not in [real(i) for i in images]:
+                images.append(chosen)      # a fix, front or logo output is not a candidate but can be chosen
+            for img in images:
+                review = read_review(img)
+                verdict = none
+                if review is not None and review.get("sha256") == sha256_file(img):
+                    verdict = L["pass" if review.get("verdict") == "pass" else "fail"] + f" ({review.get('scope')})"
+                rows.append({"concept": c.id, "image": os.path.basename(img), "verdict": verdict,
+                             "chosen": "✓" if chosen is not None and real(img) == chosen else ""})
+        lines += ["", f"## {_cell(sid)}", ""]
+        lines += _table(["concept", "image", "verdict", "chosen"], rows, none)
+        sheets = [project.rel(p) for p in (project.path("work", "sheets", f"{sid}-candidates.png"),
+                                           project.path("work", "sheets", f"{sid}-chosen.png"))
+                  if os.path.isfile(p)]
+        lines += [""] + ([f"- {p}" for p in sheets] if sheets else [none])
+    return lines
+
+
 def cmd_report(project, args) -> int:
     L = _report_labels(project)
-    lines = _report_brief(project, L) if args.what == "brief" else _report_ideas(project, L)
+    builders = {"brief": _report_brief, "ideas": _report_ideas, "renders": _report_renders}
+    lines = builders[args.what](project, L)
     text = "\n".join(lines) + "\n"
     if args.out:
         folder = os.path.dirname(os.path.abspath(args.out))
@@ -475,7 +610,7 @@ def cmd_report(project, args) -> int:
 # ---------- entry point ----------
 
 def _build_parser():
-    ap = argparse.ArgumentParser(description="Booth proposal gates: brief, frame, ideas, select, report")
+    ap = argparse.ArgumentParser(description="Booth proposal gates: brief, frame, ideas, select, renders, report")
     sub = ap.add_subparsers(dest="cmd", required=True)
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--project", default=".", help="project folder (default: current folder)")
@@ -497,8 +632,13 @@ def _build_parser():
     sel.add_argument("--show", action="store_true", help="print brief/selection.json")
     sel.add_argument("--clear", action="store_true", help="delete brief/selection.json")
 
+    p = sub.add_parser("renders", parents=[common], help="check the chosen render of each concept")
+    p.add_argument("--concept", action="append", nargs="+", metavar="KEY",
+                   help="only these concepts (<set>/<concept>)")
+    p.add_argument("--json", action="store_true")
+
     p = sub.add_parser("report", parents=[common], help="Markdown summary for the user")
-    p.add_argument("what", choices=["brief", "ideas"])
+    p.add_argument("what", choices=["brief", "ideas", "renders"])
     p.add_argument("--out", metavar="FILE", help="write the Markdown to this file")
     return ap, sel
 
@@ -523,7 +663,7 @@ def main(argv=None) -> int:
         if len(args.keys) > 26:
             sel.error("at most 26 keys")
     try:
-        project = find_project(args.project)
+        project = find_project(args.project, check_selection=not (args.cmd == "select" and args.clear))
         return globals()[f"cmd_{args.cmd}"](project, args)
     except InputError as e:
         print(f"{'ERROR':<7} {e.code:<18} {e.where}: {e}", file=sys.stderr)

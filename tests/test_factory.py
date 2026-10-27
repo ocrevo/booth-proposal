@@ -24,9 +24,13 @@ def test_factory(project):
             assert (renders / f"{stem}.png").is_file()
             hashes.add(common.sha256_file(str(renders / f"{stem}.png")))
         info = json.loads((renders / "hero-v1.json").read_text(encoding="utf-8"))
-        assert {"image", "timestamp", "input_images"} <= set(info) and info["mode"] == "hero"
+        assert info["schema"] == "sidecar/2" and info["mode"] == "hero" and info["tool"] == "render.py"
+        assert (info["set"], info["concept"]) == tuple(key.split("/"))
+        assert info["inputs"] and all(i["role"] == "ref" for i in info["inputs"])
+        assert info["outputs"] == {"hero-v1.png": common.sha256_file(str(renders / "hero-v1.png"))}
         prompt = (project / "concepts" / key / "prompts" / "hero.txt").read_text(encoding="utf-8").strip()
         assert (renders / "hero-v1.prompt.txt").read_text(encoding="utf-8") == prompt
+        assert info["prompt_sha256"] == common.sha256_file(str(renders / "hero-v1.prompt.txt"))
 
     assert len(factory.SEND_LOG) == 4
     assert all(entry["fields"]["n"] == 2 for entry in factory.SEND_LOG)

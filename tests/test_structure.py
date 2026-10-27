@@ -23,8 +23,6 @@ B_FUNC = re.compile(r"^b_[a-z]+$")
 XFAIL = {
     ("cjk", "deck.py"): "phase 3",
     ("names", "deck.py"): "phase 3",
-    ("cjk", "render.py"): "phase 1",
-    ("names", "render.py"): "phase 1",
     ("cjk", "draw_plan.py"): "phase 2",
 }
 

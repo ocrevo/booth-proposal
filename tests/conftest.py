@@ -12,6 +12,7 @@ for _p in (str(SCRIPTS), str(TESTS)):
 
 import factory  # noqa: E402
 import gates  # noqa: E402
+import render  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -69,3 +70,21 @@ def has():
         return hits
 
     return find
+
+
+@pytest.fixture
+def fake_send(monkeypatch):
+    """Replaces render.send: records (url, fields, images) in fake_send.calls and answers with fields["n"] new
+    1536x1024 PNGs (a new solid colour for each image). Sets OPENAI_API_KEY to sk-test-SECRET."""
+    import base64
+
+    def send(url, key, fields, images, image_field):
+        send.calls.append((url, dict(fields), list(images)))
+        data = [{"b64_json": base64.b64encode(factory.png_bytes(factory._next_rgb(), size=(1536, 1024))).decode("ascii")}
+                for _ in range(int(fields["n"]))]
+        return {"data": data, "usage": {"total_tokens": 1}}
+
+    send.calls = []
+    monkeypatch.setattr(render, "send", send)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-SECRET")
+    return send

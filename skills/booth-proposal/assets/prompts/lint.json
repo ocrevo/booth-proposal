@@ -1,0 +1,18 @@
+{
+  "timeline_words": ["timeline", "time line", "time-line", "chronology", "chronological", "milestone", "milestones",
+    "founded", "founding", "anniversary", "centenary", "centennial", "jubilee", "year by year",
+    "through the years", "history wall", "heritage wall"],
+  "logo_text_phrases": ["logo as in", "logo from the", "logo on the", "logo once", "logo twice", "with the logo",
+    "with its logo", "with their logo", "the logo of", "big logo", "large logo", "giant logo", "logo wall",
+    "logo reads", "that says", "saying", "spelling out", "spelled out",
+    "spelt out", "written on", "written across", "inscribed", "inscription", "engraved with", "printed with",
+    "lettering of", "lettering that", "the words", "the name of", "the names of", "with the name",
+    "with the names", "brand name", "company name", "nameplate", "name plate", "name plaque", "name plaques",
+    "with the slogan", "with a slogan", "with its slogan", "slogan reading", "caption", "captions", "wordmark",
+    "logotype",
+    "plaque to read", "sign to read", "panel to read", "wall to read", "plaque that reads", "sign that reads",
+    "panel that reads", "text that reads", "words that read", "letters that read"],
+  "one_per_patterns": ["\\bone\\s+(?:per|for\\s+(?:each|every))\\b",
+    "\\b(?:each|every)\\s+(?:one\\s+)?(?:representing|standing\\s+for|symboli[sz]ing)\\b",
+    "\\b(?:representing|symboli[sz]ing)\\s+(?:each|every|one)\\s+of\\b"]
+}

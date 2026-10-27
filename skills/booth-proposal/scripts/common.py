@@ -224,8 +224,10 @@ def _check_selection(sel: dict) -> None:
         raise InputError("C-INPUT", f"{w} display", "expected an object of strings")
 
 
-def find_project(arg: str | None) -> Project:
-    """Load a project folder. brief.json content is not checked here (that is gates.py brief)."""
+def find_project(arg: str | None, *, check_selection: bool = True) -> Project:
+    """Load a project folder. brief.json content is not checked here (that is gates.py brief).
+    check_selection=False ignores brief/selection.json (selection is None), so `gates.py select --clear` can
+    remove a malformed file."""
     root = os.path.abspath(arg or ".")
     if not os.path.isdir(os.path.join(root, "brief")):
         raise InputError("C-INPUT", root, "no brief/ folder; pass --project <project folder>")
@@ -235,9 +237,11 @@ def find_project(arg: str | None) -> Project:
     labels = load_labels(lang) if _labels_file(lang) else {}
     style = read_json_opt(os.path.join(root, "brief", "deck-style.json")) or {}
     th = thresholds(style)
-    selection = read_json_opt(os.path.join(root, "brief", "selection.json"))
-    if selection is not None:
-        _check_selection(selection)
+    selection = None
+    if check_selection:
+        selection = read_json_opt(os.path.join(root, "brief", "selection.json"))
+        if selection is not None:
+            _check_selection(selection)
     return Project(root=root, brief=brief, lang=lang, labels=labels, style=style, thresholds=th,
                    selection=selection)
 
@@ -540,3 +544,248 @@ def read_front_matter(concept: ConceptRef) -> tuple[dict, list[Finding]]:
     result["blocked"] = kept
     findings.sort(key=lambda f: int(f.where.rsplit(":", 1)[1]))
     return result, findings
+
+
+# ---------- sidecars and reviews (contract 2.4, 2.5) ----------
+
+_SIDECAR_REQUIRED = ("tool", "mode", "set", "concept", "inputs", "prompt_sha256", "lint")
+
+
+def sidecar_path(image: str) -> str:
+    return os.path.splitext(image)[0] + ".json"
+
+
+def read_sidecar(image: str) -> dict | None:
+    """The sidecar dict beside an image, or None when it is missing, unreadable or not an object."""
+    try:
+        return read_json(sidecar_path(image))
+    except InputError:
+        return None
+
+
+def sidecar_version(data) -> int:
+    """0 = none or unknown schema, 1 = old sidecar without a schema key, 2 = sidecar/2."""
+    if not isinstance(data, dict):
+        return 0
+    if "schema" not in data:
+        return 1
+    return 2 if data["schema"] == "sidecar/2" else 0
+
+
+def write_sidecar(image_or_stem: str, data: dict) -> None:
+    """Write sidecar/2 beside an image. outputs = {basename: sha256 read from disk now}."""
+    missing = [k for k in _SIDECAR_REQUIRED if k not in data]
+    if missing:
+        raise ValueError(f"sidecar data lacks: {', '.join(missing)}")
+    folder = os.path.dirname(image_or_stem)
+
+    def digest(path: str) -> str:
+        try:
+            return sha256_file(path)
+        except OSError as e:
+            raise ValueError(f"cannot hash output file {path}: {e.strerror or e}") from None
+
+    given = data.get("outputs")
+    if isinstance(given, dict):
+        outputs = {name: digest(os.path.join(folder, name)) for name in given}
+    else:
+        outputs = {os.path.basename(image_or_stem): digest(image_or_stem)}
+    out: dict = {"schema": "sidecar/2"}
+    out.update({k: v for k, v in data.items() if k not in ("schema", "outputs", "created_at")})
+    out["outputs"] = outputs
+    out["created_at"] = now_iso()
+    write_json(sidecar_path(image_or_stem), out)
+
+
+def review_path(image: str) -> str:
+    return os.path.splitext(image)[0] + ".review.json"
+
+
+def read_review(image: str) -> dict | None:
+    """The review dict beside an image, or None when missing, unreadable or not review/1."""
+    try:
+        data = read_json(review_path(image))
+    except InputError:
+        return None
+    return data if data.get("schema") == "review/1" else None
+
+
+def review_is_current_pass(image: str, need_full: bool) -> tuple[bool, str]:
+    """(True, "") when the image has a review of its current bytes with verdict pass (and scope full if needed)."""
+    r = read_review(image)
+    if r is None:
+        return False, "missing: no review; run render.py review"
+    try:
+        current = sha256_file(image)
+    except OSError:
+        current = None
+    if r.get("sha256") != current:
+        return False, "stale: the image changed after review; run render.py review"
+    if r.get("verdict") != "pass":
+        return False, "fail: review verdict is fail"
+    if need_full and r.get("scope") != "full":
+        return False, "scope: a chosen render needs --scope full; run render.py review"
+    return True, ""
+
+
+# ---------- forbidden and logo hashes (contract 6.6) ----------
+
+_MAX_HASH_BYTES = 300 * 1024 * 1024
+
+
+def _files_under(folder: str):
+    for dirpath, dirnames, filenames in os.walk(folder):
+        dirnames.sort()
+        for name in sorted(filenames):
+            yield os.path.join(dirpath, name)
+
+
+def _hash_or_none(path: str) -> str | None:
+    try:
+        if os.path.getsize(path) > _MAX_HASH_BYTES:
+            return None
+        return sha256_file(path)
+    except OSError:
+        return None
+
+
+def logo_hashes(project: Project) -> set[str]:
+    """Hashes of the deck-style logo (path relative to brief/) and of every file under brief/brand/."""
+    paths = list(_files_under(project.path("brief", "brand")))
+    logo = project.style.get("logo")
+    if isinstance(logo, str) and logo:
+        p = os.path.join(project.path("brief"), logo)
+        if os.path.isfile(p):
+            paths.append(p)
+    return {h for h in (_hash_or_none(p) for p in paths) if h}
+
+
+def forbidden_hashes(project: Project) -> dict[str, str]:
+    """{sha256: project-relative path} of everything that must never appear as a render or in the deck:
+    stamped reference files, input/, brief/media/ and the ref inputs of sidecars. Logo files are removed
+    unless the hash is a stamped reference file."""
+    out: dict[str, str] = {}
+    stamped: set[str] = set()
+
+    def add(h, path) -> None:
+        if isinstance(h, str) and h and h not in out:
+            out[h] = path
+
+    refs = project.brief.get("references")
+    sets = refs.get("sets") if isinstance(refs, dict) else None
+    for s in sets if isinstance(sets, list) else []:
+        files = s.get("files") if isinstance(s, dict) else None
+        for f in files if isinstance(files, list) else []:
+            if isinstance(f, dict) and isinstance(f.get("sha256"), str) and isinstance(f.get("path"), str):
+                stamped.add(f["sha256"])
+                add(f["sha256"], f["path"])
+    for folder in (("input",), ("brief", "media")):
+        for p in _files_under(project.path(*folder)):
+            add(_hash_or_none(p), project.rel(p))
+    for c in list_concepts(project):
+        renders = os.path.join(c.dir, "renders")
+        try:
+            names = sorted(os.listdir(renders))
+        except OSError:
+            continue
+        for name in names:
+            low = name.lower()
+            if not low.endswith(".json") or low.endswith(".review.json"):
+                continue
+            sc = read_sidecar(os.path.join(renders, name))
+            ver = sidecar_version(sc)
+            if ver == 2:
+                inputs = sc.get("inputs")
+                for i in inputs if isinstance(inputs, list) else []:
+                    if isinstance(i, dict) and i.get("role") == "ref":
+                        add(i.get("sha256"), i["path"] if isinstance(i.get("path"), str) else "")
+            elif ver == 1:
+                imgs = sc.get("input_images")
+                for p in imgs if isinstance(imgs, list) else []:
+                    if not isinstance(p, str) or p.replace("\\", "/").startswith("concepts/"):
+                        continue
+                    full = os.path.join(project.root, p)
+                    if os.path.isfile(full):
+                        add(_hash_or_none(full), p.replace("\\", "/"))
+    for h in logo_hashes(project):
+        if h not in stamped:
+            out.pop(h, None)
+    return out
+
+
+# ---------- base chain (contract 2.4) ----------
+
+_CHAIN_MAX = 20
+_BASE_MODES = ("fix", "front", "logo", "label")
+
+
+def trace_base_chain(project: Project, image: str) -> tuple[list[str], Finding | None]:
+    """Follow the single base input of a render back to a hero or import. Returns (visited project-relative
+    paths, None) or (visited, Finding R-SOURCE); callers outside render.py re-code the finding."""
+    where = project.rel(image)
+    visited: list[str] = []
+
+    def fail(msg: str):
+        return visited, Finding("R-SOURCE", "error", where, msg)
+
+    c = concept_of_path(project, image)
+    if c is None:
+        return fail("chain: not a render of any concept")
+    renders = real(os.path.join(c.dir, "renders"))
+    forbidden = forbidden_hashes(project)
+    seen: set[str] = set()
+    cur = image
+    while True:
+        rel = project.rel(cur)
+        if not os.path.isfile(cur) or not inside(renders, cur):
+            return fail(f"chain: {rel} is not a render of {c.key}")
+        key = real(cur)
+        if key in seen:
+            return fail(f"chain: cycle at {rel}")
+        seen.add(key)
+        visited.append(rel)
+        h = sha256_file(cur)
+        if h in forbidden:
+            return fail(f"chain: {rel} has the same content as {forbidden[h]}")
+        sc = read_sidecar(cur)
+        ver = sidecar_version(sc)
+        if ver == 0:
+            return fail(f"chain: {rel} has no sidecar")
+        if ver == 1:
+            return visited, None
+        outputs = sc.get("outputs")
+        if not isinstance(outputs, dict) or outputs.get(os.path.basename(cur)) != h:
+            return fail(f"chain: sidecar hash differs from {rel}")
+        inputs = sc.get("inputs") if isinstance(sc.get("inputs"), list) else []
+        bases = [i for i in inputs if isinstance(i, dict) and i.get("role") == "base"]
+        mode = sc.get("mode")
+        if mode in ("hero", "import") and not bases:
+            return visited, None
+        if mode in _BASE_MODES and len(bases) == 1 and isinstance(bases[0].get("path"), str):
+            base = os.path.join(project.root, bases[0]["path"])
+            if _hash_or_none(base) != bases[0].get("sha256"):
+                return fail(f"chain: {bases[0]['path']} changed after {rel} was made")
+            if len(visited) >= _CHAIN_MAX:
+                return fail(f"chain: longer than {_CHAIN_MAX} steps")
+            cur = base
+            continue
+        return fail(f"chain: mode {mode} cannot start a chain")
+
+
+# ---------- fonts ----------
+
+_CJK_FONTS = ("C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/simhei.ttf", "/System/Library/Fonts/PingFang.ttc",
+              "/usr/share/fonts/**/NotoSansCJK*.ttc", "C:/Windows/Fonts/msyhbd.ttc",
+              "/System/Library/Fonts/Hiragino Sans GB.ttc", "/usr/share/fonts/**/NotoSansCJK*.otf")
+_LATIN_FONTS = ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf", "/System/Library/Fonts/Helvetica.ttc",
+                "/usr/share/fonts/**/DejaVuSans.ttf")
+
+
+def find_font(cjk: bool) -> str | None:
+    """First font file that exists (CJK-capable when cjk is true); None means use Pillow's default font."""
+    import glob
+    for pattern in _CJK_FONTS if cjk else _LATIN_FONTS:
+        for path in sorted(glob.glob(pattern, recursive=True)):
+            if os.path.isfile(path):
+                return path
+    return None

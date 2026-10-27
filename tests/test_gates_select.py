@@ -80,3 +80,17 @@ def test_select_refused(make_project, run_gates, has, case):
     if code_name:
         assert has(out, code_name, rule), out
     assert _sel_path(root).read_bytes() == before
+
+
+def test_select_clear_with_malformed_selection(make_project, run_gates):
+    root = make_project(renders=False)
+    _sel_path(root).write_text('{"schema": "selection/1", "selected": "not a list"}', encoding="utf-8")
+    code, out, err = run_gates(root, "select", "--show")
+    assert code == 2 and "C-INPUT" in err
+    code, out, err = run_gates(root, "brief")
+    assert code == 2 and "C-INPUT" in err
+    code, out, err = run_gates(root, "select", "--clear")
+    assert code == 0, out + err
+    assert not _sel_path(root).exists()
+    code, out, err = run_gates(root, "select", "set-1/A")
+    assert code == 0, out + err

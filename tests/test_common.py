@@ -7,6 +7,7 @@ import sys
 import pytest
 
 import common
+import factory
 
 
 @pytest.mark.parametrize("case", ["roundtrip", "bom", "invalid_json", "missing", "list", "wrong_schema",
@@ -173,3 +174,158 @@ def test_small_helpers(tmp_path, case):
     elif case == "hex_rgb":
         assert common.hex_rgb("#0B3D5C") == (11, 61, 92)
 
+
+
+# ---------- sidecars, forbidden hashes, base chain, review state (phase 1, step 3) ----------
+
+def test_sidecar_write_read(tmp_path):
+    img = tmp_path / "hero-v1.png"
+    img.write_bytes(factory.png_bytes((1, 2, 3)))
+    data = {"tool": "render.py", "mode": "hero", "set": "set-1", "concept": "A", "inputs": [],
+            "prompt_sha256": None, "lint": None, "outputs": {"hero-v1.png": "bogus"}, "created_at": "old",
+            "schema": "old"}
+    common.write_sidecar(str(img), data)
+    side = common.read_sidecar(str(img))
+    assert common.sidecar_path(str(img)) == str(tmp_path / "hero-v1.json")
+    assert common.sidecar_version(side) == 2
+    assert side["outputs"] == {"hero-v1.png": common.sha256_file(str(img))}
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d", side["created_at"])
+    assert list(side)[0] == "schema" and list(side)[-2:] == ["outputs", "created_at"]
+    assert list(side)[1:-2] == ["tool", "mode", "set", "concept", "inputs", "prompt_sha256", "lint"]
+    bad = {k: v for k, v in data.items() if k != "lint"}
+    with pytest.raises(ValueError):
+        common.write_sidecar(str(img), bad)
+    with pytest.raises(ValueError):
+        common.write_sidecar(str(img), {**data, "outputs": {"missing.png": "x"}})
+
+
+@pytest.mark.parametrize("data,expected", [
+    (None, 0), ([], 0), ({"schema": "sidecar/2"}, 2), ({"mode": "hero"}, 1), ({"schema": "sidecar/3"}, 0)])
+def test_sidecar_version(data, expected):
+    assert common.sidecar_version(data) == expected
+
+
+def test_read_sidecar_unreadable(tmp_path):
+    img = tmp_path / "a.png"
+    img.write_bytes(b"x")
+    assert common.read_sidecar(str(img)) is None
+    (tmp_path / "a.json").write_text("[1]", encoding="utf-8")
+    assert common.read_sidecar(str(img)) is None
+    (tmp_path / "a.json").write_text("{bad", encoding="utf-8")
+    assert common.read_sidecar(str(img)) is None
+
+
+@pytest.mark.parametrize("case", ["reference", "rfp", "media", "logo_copy", "logo_that_is_a_reference"])
+def test_forbidden_hashes(project, case):
+    ref = project / "input" / "refs" / "set-1" / "r01.png"
+    if case == "media":
+        media = project / "brief" / "media" / "m.png"
+        media.parent.mkdir(parents=True)
+        media.write_bytes(factory.png_bytes(factory._next_rgb()))
+    if case == "logo_that_is_a_reference":
+        (project / "brief" / "brand" / "ref-copy.png").write_bytes(ref.read_bytes())
+    path = {"reference": ref, "rfp": project / "input" / "rfp.md", "media": project / "brief" / "media" / "m.png",
+            "logo_copy": project / "input" / "brand-logo.png",
+            "logo_that_is_a_reference": project / "brief" / "brand" / "ref-copy.png"}[case]
+    forbidden = common.forbidden_hashes(common.find_project(str(project)))
+    h = common.sha256_file(str(path))
+    if case == "logo_copy":
+        assert h not in forbidden
+    else:
+        assert h in forbidden
+    if case in ("reference", "logo_that_is_a_reference"):
+        assert forbidden[h] == "input/refs/set-1/r01.png"
+
+
+@pytest.mark.parametrize("case", ["factory_hero", "v1_hero", "reference_copy", "other_concept", "cycle"])
+def test_base_chain(project, case):
+    proj = common.find_project(str(project))
+    ref = "input/refs/set-1/r01.png"
+    if case == "factory_hero":
+        rel = "concepts/set-1/A/renders/hero-v1.png"
+    elif case == "v1_hero":
+        rel = factory.add_render(project, "set-1/A", "hero-v5.png", version=1, refs=[ref])
+    elif case == "reference_copy":
+        rel = factory.add_render(project, "set-1/A", "hero-v9.png", refs=[ref],
+                                 data=(project / ref).read_bytes())
+    elif case == "other_concept":
+        rel = factory.add_render(project, "set-1/A", "hero-v8.png", mode="fix",
+                                 base="concepts/set-1/B/renders/hero-v1.png")
+    else:
+        a = factory.add_render(project, "set-1/A", "hero-v6.png", version=None)
+        rel = factory.add_render(project, "set-1/A", "hero-v7.png", mode="fix", base=a)
+        factory.put_sidecar(project, a, "fix", base=rel)
+    visited, finding = common.trace_base_chain(proj, str(project / rel))
+    if case in ("factory_hero", "v1_hero"):
+        assert finding is None and visited[0] == rel
+        return
+    assert finding.code == "R-SOURCE" and finding.level == "error" and finding.where == rel
+    assert finding.message.startswith("chain: ")
+    expected = {"reference_copy": f"has the same content as {ref}",
+                "other_concept": "is not a render of set-1/A", "cycle": "cycle at "}[case]
+    assert expected in finding.message
+    if case == "cycle":
+        assert len(visited) == 2
+
+
+def test_base_chain_ends_at_hero_through_fix(project):
+    proj = common.find_project(str(project))
+    hero = factory.add_render(project, "set-1/A", "hero-v6.png", refs=["input/refs/set-1/r01.png"])
+    fix = factory.add_render(project, "set-1/A", "hero-v7.png", mode="fix", base=hero)
+    assert common.trace_base_chain(proj, str(project / fix)) == ([fix, hero], None)
+    (project / hero).write_bytes(factory.png_bytes(factory._next_rgb()))     # the base changes after the fix
+    _, finding = common.trace_base_chain(proj, str(project / fix))
+    assert finding.code == "R-SOURCE" and "changed after" in finding.message
+    assert common.trace_base_chain(proj, str(project / "input" / "product.png"))[1].message == \
+        "chain: not a render of any concept"
+
+
+def _review(project, rel, **over):
+    image = project / rel
+    review = {"schema": "review/1", "image": image.name, "sha256": common.sha256_file(str(image)),
+              "scope": "full", "verdict": "pass"}
+    review.update(over)
+    common.write_json(common.review_path(str(image)), review)
+    return str(image)
+
+
+@pytest.mark.parametrize("case", ["missing", "stale", "fail", "scope"])
+def test_review_is_current_pass(project, case):
+    rel = "concepts/set-1/A/renders/hero-v1.png"
+    image = str(project / rel)
+    if case == "missing":
+        assert common.read_review(image) is None
+        ok, why = common.review_is_current_pass(image, True)
+        assert not ok and why.startswith("missing:")
+        return
+    _review(project, rel, **({"verdict": "fail"} if case == "fail" else {"scope": "whole"} if case == "scope" else {}))
+    if case == "stale":
+        (project / rel).write_bytes(factory.png_bytes(factory._next_rgb()))
+    ok, why = common.review_is_current_pass(image, True)
+    assert not ok and why.startswith(f"{case}:")
+    if case == "stale":
+        assert "run render.py review" in why
+    if case == "scope":
+        assert common.review_is_current_pass(image, False) == (True, "")
+
+
+def test_read_review_schema(project):
+    rel = "concepts/set-1/A/renders/hero-v1.png"
+    image = _review(project, rel, schema="review/0")
+    assert common.read_review(image) is None
+    image = _review(project, rel)
+    assert common.read_review(image)["verdict"] == "pass"
+    assert common.review_is_current_pass(image, True) == (True, "")
+
+
+def test_logo_hashes_and_find_font(project):
+    proj = common.find_project(str(project))
+    logo = common.sha256_file(str(project / "input" / "brand-logo.png"))
+    assert common.logo_hashes(proj) == {logo}
+    extra = project / "brief" / "extra-logo.png"
+    extra.write_bytes(factory.png_bytes(factory._next_rgb()))
+    proj.style["logo"] = "extra-logo.png"
+    assert common.logo_hashes(proj) == {logo, common.sha256_file(str(extra))}
+    for cjk in (False, True):
+        font = common.find_font(cjk)
+        assert font is None or font.lower().endswith((".ttf", ".ttc", ".otf"))
