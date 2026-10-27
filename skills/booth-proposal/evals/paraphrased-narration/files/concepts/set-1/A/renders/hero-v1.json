@@ -1,0 +1,29 @@
+{
+  "schema": "sidecar/2",
+  "tool": "render.py",
+  "mode": "import",
+  "set": "set-1",
+  "concept": "A",
+  "inputs": [
+    {
+      "role": "ref",
+      "path": "input/refs/set-1/r01.png",
+      "sha256": "57458aae351920caf045c82d9bd106fa87514aa83024148a76163d1ea5850a17"
+    },
+    {
+      "role": "ref",
+      "path": "input/refs/set-1/r02.png",
+      "sha256": "e6549a0dbd8a87ccce4b52c74923976b0fc9da47f303ba6950cf443268d1aba7"
+    }
+  ],
+  "prompt_sha256": "b7d8f1fee3df484c560b9e477d6ad3bdaf9d7da66c3092bcefa04cbcdc03ec73",
+  "lint": {
+    "status": "pass",
+    "codes": []
+  },
+  "api": null,
+  "outputs": {
+    "hero-v1.png": "db33dd40275ebb28454108293f6268be0ee2f98f917b9875568116f57c306bee"
+  },
+  "created_at": "2026-10-01T09:00:02+02:00"
+}

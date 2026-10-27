@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: paraphrased-narration
+expected_outcome: |
+  A draft English proposal for the selected concept set-1/A narrates the reference in five planted sentences:
+  P1 "This time the hull wall goes deeper and brighter than before.", P2 "Visitors who knew the old blue hull will feel
+  at home.", P3 "We kept the familiar curve and made it calmer.", P4 "It builds on the stand people already know." and
+  P5 "The palette carries forward Nordvik's Signal Yellow.". It also places a reference photo in a figure.pic
+  (../input/refs/set-1/r01.png) and has a slide with a data: background image. `deck.py check` reports the photo
+  (D-IMG-FORBIDDEN), the data: URL (D-IMG-URL) and the pending words of P1, P3, P4 and P5 (D-TXT-PENDING); P2 is a
+  paraphrase that only the Pass 1 cold read catches. The skill removes the photo and the data: image without placing
+  another reference image, rewrites or removes P1 to P4 and records each in Pass 1, keeps P5 as brand language with
+  decision keep, does Pass 2, runs `deck.py review --record` and then `deck.py export`, which writes pack/proposal.pdf.
+context:
+  scaffold_script: place-files.sh

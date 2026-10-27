@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposal</title>
+<!--
+  BOOTH PROPOSAL DECK v2 – design system and component library (generic, client-neutral, language-neutral).
+
+  How deck.py uses this file  (comments in this file never contain literal tags, so regexes on tags are safe)
+  - style#tokens  : the single palette. Colours, --sans, --header, --stamp, --rec-label, --todo-label and
+                    --claim-label live only here. deck.py new writes the block and deck.py style rewrites it,
+                    from brief/deck-style.json and the labels file of the brief language.
+  - style#design  : copied verbatim into pack/proposal.html (self-contained, no external CSS/JS/fonts).
+  - script#viewer : copied verbatim, last element of body.
+  - html[lang]    : the brief language, set by deck.py new.
+  - Examples      : each section.slide.LAYOUT[.VARIANT] below is the reference markup of one component.
+                    data-roles="role ..." lists the slide roles it serves; the first becomes the emitted
+                    data-role (deck.py layouts --emit LAYOUT[:VARIANT]), and data-roles itself is removed.
+  - Text slots    : data-slot="name" with an optional data-max="N" (N chars; a CJK character or a Latin
+                    letter counts 1; --emit multiplies N by the language's budget_factor).
+                    Every unfilled leaf slot starts with the literal text "TODO" or "TODO: hint".
+  - data-repeat   : data-repeat="group" marks the repeat units of an example (one group per example);
+                    --emit --count N keeps or clones units and renumbers their slots and numbers.
+  - data-img      : "render", "plan" or "logo" on every img (informational: what belongs there).
+                    Template images are data: placeholders; --emit empties src; deck paths are relative to pack/.
+  - data-auto     : an element filled by --emit and new with the labels value at that dotted key
+                    ({} = the nearest data-concept letter).
+  - Renders       : figure.render holding one img, stamped by CSS with --stamp.
+    Plans, site   : figure.pic.contain holding one img (no stamp, letterboxed).
+    Annotations   : figure.render.annotated holding one img and .pin callouts; data-x and data-y place a
+                    pin in percent of the figure (the viewer script sets left and top).
+  - data-claim    : data-claim="Cn" on an element marks a claim awaiting client sign-off; the ID never shows,
+                    CSS draws the --claim-label tag after the element.
+  - data-ref      : a design-point ID or a page data-id; deck.py render writes the page reference text
+                    (data-ref-style="num" for a bare page number). Never typed by hand.
+  - Viewer: ?slide=N shows only slide N at exactly 1920x1080 (screenshots);
+            ?check=1 writes JSON [{slide,id,slot,overflow_px}] into pre#overflow-report (appended last in body).
+  - Print: Chrome "Save as PDF" / --print-to-pdf gives one 1920x1080 page per slide, backgrounds kept.
+-->
+<style id="tokens">
+:root{
+  --paper:#FAFAF7;
+  --surface:#F1F0EB;
+  --tint:#E6E4DD;
+  --line:#D6D3CA;
+  --muted:#A19D93;
+  --muted-text:#6C685F;
+  --ink:#26251F;
+  --ink-strong:#121210;
+  --primary:#22313B;
+  --primary-alt:#3D5260;
+  --accent:#A8743F;
+  --brand-extra:#6B8A8E;
+  --warn:#C27C12;
+  --sans:"Microsoft YaHei","PingFang SC","Noto Sans SC","Source Han Sans SC","Helvetica Neue","Segoe UI",Arial,sans-serif;
+  --header:"";
+  --stamp:"Draft – concept visualization, not for construction";
+  --rec-label:"Recommended";
+  --todo-label:"To be supplied";
+  --claim-label:"To be confirmed";
+  --on-accent:#FFFFFF;
+}
+</style>
+<style id="design">
+/* =====================================================================
+   0. DEFAULTS  (specificity 0; colours, fonts and labels come only from #tokens)
+   ===================================================================== */
+:where(:root){
+  /* type scale (px at 1920 x 1080) */
+  --fs-display:200px;  /* concept letters, divider numbers – light */
+  --fs-cover:72px;     /* cover and divider titles – bold */
+  --fs-statement:60px; /* statement page – light */
+  --fs-title:48px;     /* page titles – bold */
+  --fs-name:44px;      /* concept names – bold */
+  --fs-h2:32px;        /* block headings – bold */
+  --fs-h3:26px;        /* card headings in dense grids – bold */
+  --fs-lead:28px;      /* lead sentences – regular */
+  --fs-body:22px;      /* body – regular, 1.65 */
+  --fs-small:18px;     /* dense body, tables, captions */
+  --fs-label:16px;     /* letter-spaced labels */
+  --fs-micro:14px;     /* running header, page number, tags */
+  --lh-body:1.65; --lh-tight:1.22;
+  --track-label:.14em;
+
+  /* spacing scale */
+  --s1:8px; --s2:16px; --s3:24px; --s4:32px; --s5:48px; --s6:64px; --s7:80px; --s8:120px;
+  /* grid: 12 columns of 110 px, 40 px gutters, 80 px outer margins */
+  --m:80px; --g:40px;
+
+  --chrome:var(--muted-text);
+  --on-accent:#fff;   /* text on accent tags; deck.py switches it to --ink-strong when white is too faint */
+}
+
+/* =====================================================================
+   1. BASE
+   ===================================================================== */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-size-adjust:100%}
+body{margin:0;padding:32px 0 8px;background:#D8D6D0;font-family:var(--sans);color:var(--ink);
+  counter-reset:page;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-kerning:normal}
+h1,h2,h3,h4,p,ol,ul,dl,dd,figure,blockquote{margin:0;padding:0}
+ol,ul{list-style:none}
+b,strong{font-weight:700}
+img{display:block;max-width:none}
+p,li,dd,td,blockquote{text-wrap:pretty}
+h1,h2,h3,.say,.man{text-wrap:balance}  /* manifestos break into even lines, not a stranded last word */
+
+/* =====================================================================
+   2. SLIDE + PAGE CHROME
+   ===================================================================== */
+.slide{position:relative;width:1920px;height:1080px;overflow:hidden;margin:0 auto 40px;
+  display:flex;flex-direction:column;padding:112px var(--m) 104px;
+  background:var(--paper);color:var(--ink);counter-increment:page;
+  font-size:var(--fs-body);line-height:var(--lh-body);line-break:strict;overflow-wrap:break-word}
+/* running header (deck-style.header) */
+.slide::before{content:var(--header);position:absolute;top:40px;left:var(--m);right:480px;z-index:5;
+  font-size:var(--fs-micro);line-height:24px;letter-spacing:.16em;color:var(--chrome);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* page number */
+.slide::after{content:counter(page,decimal-leading-zero);position:absolute;right:var(--m);bottom:40px;z-index:5;
+  font-size:var(--fs-micro);line-height:24px;letter-spacing:.12em;color:var(--chrome);font-variant-numeric:tabular-nums}
+.body{position:relative;flex:1 1 auto;min-height:0;min-width:0}
+
+/* title with the double rule: thick short bar on a hairline */
+.head{position:relative;flex:none;display:flex;align-items:baseline;gap:28px;padding-bottom:30px;margin-bottom:56px}
+.head::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--line)}
+.head::before{content:"";position:absolute;left:0;bottom:0;width:72px;height:6px;background:var(--primary);z-index:1}
+.head .no{flex:none;font-size:var(--fs-title);font-weight:300;line-height:var(--lh-tight);color:var(--accent);font-variant-numeric:lining-nums tabular-nums}
+.head .title{font-size:var(--fs-title);font-weight:700;line-height:var(--lh-tight);color:var(--ink-strong);letter-spacing:.01em;min-width:0}
+.head .kicker{margin-left:auto;flex:none;align-self:flex-end;font-size:var(--fs-label);letter-spacing:var(--track-label);color:var(--muted-text)}
+
+/* text roles */
+.lead{font-size:var(--fs-lead);line-height:1.55;color:var(--ink)}
+.label{font-size:var(--fs-label);line-height:1.5;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--muted-text)}
+.label.acc{color:var(--accent);font-weight:700}
+.small{font-size:var(--fs-small);line-height:1.6}
+.micro{font-size:var(--fs-micro);line-height:1.5;letter-spacing:.06em;color:var(--muted-text)}
+.alt{font-size:var(--fs-label);letter-spacing:.16em;text-transform:uppercase;color:var(--muted-text);line-height:1.5}
+.letter{font-weight:300;color:var(--accent);line-height:.8;letter-spacing:-.02em;font-variant-numeric:lining-nums}
+.rule-s{display:block;width:48px;height:3px;background:var(--ink-strong)}
+
+/* dark page modifier (any layout) */
+.slide.dark{background:var(--ink-strong);color:var(--paper);--chrome:rgba(255,255,255,.55)}
+.slide.dark .head .title,.slide.dark h2,.slide.dark h3{color:var(--paper)}
+.slide.dark .head::after{background:rgba(255,255,255,.22)}
+.slide.dark .head::before{background:var(--accent)}
+.slide.dark .label,.slide.dark .micro{color:rgba(255,255,255,.62)}
+
+/* =====================================================================
+   3. IMAGES, STAMP, PLACEHOLDER, CLAIM TAG
+   ===================================================================== */
+figure.render,figure.pic{position:relative;overflow:hidden;margin:0;min-width:0;min-height:0;background:var(--tint)}
+figure.render>img,figure.pic>img{display:block;width:100%;height:100%;object-fit:cover}
+figure.contain>img{object-fit:contain}
+figure.pic.contain{background:transparent}
+figure.render{container-type:inline-size}
+/* the draft stamp on every booth render */
+figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14px;z-index:3;max-width:calc(100% - 28px);
+  padding:4px 10px;font-size:13px;line-height:18px;letter-spacing:.02em;font-weight:400;
+  color:rgba(255,255,255,.94);background:rgba(16,16,14,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* on small renders the stamp wraps instead of losing its end: the draft note must stay whole */
+@container (max-width:760px){figure.render::after{right:10px;bottom:10px;max-width:calc(100% - 20px);padding:3px 8px;font-size:11px;line-height:15px;white-space:normal;text-overflow:clip}}
+
+.placeholder{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:10px;
+  min-width:0;min-height:120px;padding:32px 36px;border:2px dashed var(--warn);
+  background:color-mix(in srgb,var(--warn) 6%,var(--paper));color:color-mix(in srgb,var(--warn) 55%,var(--ink));
+  font-size:var(--fs-small);line-height:1.55}
+.placeholder::before{content:var(--todo-label);font-size:var(--fs-micro);font-weight:700;letter-spacing:.16em;color:var(--warn)}
+/* on dark pages the panel stays dark: a missing image must not become the brightest thing on the page */
+.stage .placeholder,.divider .placeholder,.slide.dark .placeholder{background:color-mix(in srgb,var(--warn) 10%,transparent);color:rgba(255,255,255,.82)}
+
+/* a claim the client must sign off: data-claim="Cn" on the element (the ID never shows); the tag is drawn here */
+[data-claim]::after{content:var(--claim-label);display:inline-block;margin-left:.6em;padding:1px 8px;vertical-align:.18em;
+  font-size:13px;font-weight:400;line-height:18px;letter-spacing:.06em;white-space:nowrap;text-transform:none;
+  color:var(--muted-text);background:var(--paper);border:1px solid var(--line)}
+.slide.dark [data-claim]::after,.stage [data-claim]::after{color:rgba(255,255,255,.72);background:transparent;border-color:rgba(255,255,255,.3)}
+
+/* =====================================================================
+   4. COMPONENTS
+   ===================================================================== */
+
+/* ---------- cover ---------- */
+.cover{padding:0}
+.cover::before,.cover::after{content:none}
+.logo-tile{z-index:4}
+.logo-tile img{max-height:64px;max-width:280px;width:auto;height:auto;object-fit:contain}
+.cover .eyebrow{font-size:var(--fs-label);letter-spacing:.18em;line-height:1.5}
+.cover .ctitle{font-size:var(--fs-cover);font-weight:700;line-height:1.2;letter-spacing:.01em}
+.cover .csub{font-size:var(--fs-lead);font-weight:300;line-height:1.5}
+.cover .meta{font-size:var(--fs-micro);letter-spacing:.14em;line-height:1.6}
+/* bleed: the hero render fills the page, title on a legibility scrim */
+.cover.bleed>figure.render{position:absolute;inset:0}
+.cover.bleed>figure.render::before{content:"";position:absolute;inset:0;z-index:1;
+  background:linear-gradient(to top,rgba(8,8,8,.66) 0%,rgba(8,8,8,.34) 34%,rgba(8,8,8,0) 60%)}
+.cover.bleed .logo-tile{position:absolute;top:0;left:var(--m);padding:30px 32px 26px;background:var(--paper)}
+.cover.bleed .ct{position:absolute;left:var(--m);right:var(--m);bottom:96px;z-index:4;color:#fff;
+  display:grid;grid-template-columns:minmax(0,1fr) 400px;column-gap:80px;align-items:end}
+.cover.bleed .eyebrow{color:rgba(255,255,255,.82);margin-bottom:20px}
+.cover.bleed .csub{color:rgba(255,255,255,.88);margin-top:16px}
+.cover.bleed .meta{color:rgba(255,255,255,.78);text-align:right;padding-bottom:10px}
+/* split: text panel left, render bleeding right */
+.cover.split{display:grid;grid-template-columns:830px minmax(0,1fr)}
+.cover.split .ct{display:flex;flex-direction:column;padding:88px 80px 96px var(--m);min-height:0}
+.cover.split .logo-tile{margin-bottom:auto}
+.cover.split .eyebrow{color:var(--accent);font-weight:700;margin-bottom:28px}
+.cover.split .ctitle{color:var(--ink-strong)}
+.cover.split .csub{color:var(--muted-text);margin-top:20px}
+.cover.split .rule-s{margin:56px 0 28px;background:var(--primary)}
+.cover.split .meta{color:var(--muted-text)}
+.cover.split>figure.render{height:1080px}
+
+/* ---------- agenda ---------- */
+.agenda{display:grid;grid-template-columns:560px minmax(0,1fr);column-gap:190px;padding-top:140px}
+.agenda .ah h1{font-size:var(--fs-cover);font-weight:700;line-height:1.15;color:var(--ink-strong)}
+.agenda .ah .rule-s{margin-top:40px;width:72px;height:6px;background:var(--primary)}
+.agenda ol{border-top:1px solid var(--ink-strong);align-self:start}
+.agenda li{display:grid;grid-template-columns:96px minmax(0,1fr) auto;column-gap:32px;align-items:baseline;padding:24px 0 26px;border-bottom:1px solid var(--line)}
+.agenda li .n{font-size:40px;font-weight:300;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.agenda li h3{font-size:30px;font-weight:700;line-height:1.3;color:var(--ink-strong)}
+.agenda li p{font-size:var(--fs-small);line-height:1.5;color:var(--muted-text);margin-top:6px}
+.agenda li .pg{font-size:var(--fs-micro);letter-spacing:.12em;color:var(--muted-text);font-variant-numeric:tabular-nums}
+
+/* ---------- divider ---------- */
+.divider{background:var(--primary);color:var(--paper);--chrome:rgba(255,255,255,.55);padding:120px var(--m) 128px}
+.divider::before{content:none}
+.divider .body{display:flex;flex-direction:column;justify-content:space-between}
+.divider .dno{font-size:var(--fs-display);font-weight:300;line-height:.8;letter-spacing:-.03em;color:var(--accent);font-variant-numeric:lining-nums}
+.divider .dt{border-top:1px solid rgba(255,255,255,.24);padding-top:44px;max-width:1160px}
+.divider .dtitle{font-size:var(--fs-cover);font-weight:700;line-height:1.2;color:var(--paper)}
+.divider .dsub{font-size:var(--fs-lead);font-weight:300;line-height:1.55;color:rgba(255,255,255,.74);margin-top:20px}
+.divider.split{padding-right:1040px}
+.divider.split>figure.render{position:absolute;top:0;right:0;bottom:0;width:960px}
+.divider.split::after{color:rgba(255,255,255,.55);right:auto;left:var(--m)}
+.divider.split .dt{max-width:none}
+
+/* ---------- statement ---------- */
+.statement .body{display:flex;flex-direction:column;justify-content:center;padding:0 0 24px}
+.statement .tag{display:flex;align-items:center;gap:24px;margin-bottom:56px}
+.statement .tag::before{content:"";flex:none;width:72px;height:6px;background:var(--accent)}
+.statement .say{font-size:var(--fs-statement);font-weight:300;line-height:1.42;letter-spacing:.01em;color:var(--ink-strong);max-width:1460px}
+.statement .say b,.statement .say strong{font-weight:700;color:var(--primary)}
+.statement .by{margin-top:56px;font-size:var(--fs-small);line-height:1.6;color:var(--muted-text);max-width:1010px}
+
+/* ---------- cards (n2 / n3 / n4 / n6) ---------- */
+/* the grid follows the lead and each card reads top down (number, then text): no band inside or above the cards */
+.cards .body{display:flex;flex-direction:column;gap:56px}
+.cards .lead{flex:none;max-width:1310px}
+.cards .grid{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--g);align-items:stretch}
+.cards.n2 .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cards.n4 .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:40px 40px 40px 48px;background:var(--surface)}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+.card .k{font-size:var(--fs-label);font-weight:700;letter-spacing:var(--track-label);color:var(--accent);line-height:1.5}
+.card .num{font-size:56px;font-weight:300;line-height:1;color:var(--accent);font-variant-numeric:lining-nums}
+.card .txt{padding-top:32px}
+.card h3{font-size:var(--fs-h2);font-weight:700;line-height:1.35;color:var(--ink-strong)}
+.card .txt p:not(.k){font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink);margin-top:14px}
+.card .txt .k{margin-bottom:10px}
+.card .tags{margin-top:20px;font-size:var(--fs-micro);letter-spacing:.08em;color:var(--muted-text)}
+.cards.n4 .card,.cards.n6 .card{padding:32px 32px 32px 40px}
+.cards.n4 h3,.cards.n6 h3{font-size:var(--fs-h3)}
+.cards.n4 .card .txt p:not(.k),.cards.n6 .card .txt p:not(.k){font-size:19px;line-height:1.6;margin-top:10px}
+.cards.n6 .num{font-size:40px}
+.cards.n6 .txt{padding-top:20px}
+
+/* ---------- facts (key–value list + image) ---------- */
+.facts .body{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:var(--g)}
+.facts .side{grid-column:1 / span 5;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.facts .side .lead{margin-bottom:40px}
+.facts .kv{border-top:1px solid var(--ink-strong)}
+.facts .kv>div{display:grid;grid-template-columns:140px minmax(0,1fr);column-gap:24px;align-items:baseline;padding:18px 0 19px;border-bottom:1px solid var(--line)}
+.facts dt{font-size:var(--fs-label);letter-spacing:.1em;color:var(--muted-text);line-height:1.5}
+.facts dd{font-size:24px;line-height:1.45;color:var(--ink-strong)}
+.facts .body>figure,.facts .body>.placeholder{grid-column:7 / span 6}
+
+/* ---------- overview (concepts side by side) ---------- */
+/* one column per concept (2, 3 or 4), equal widths; with two, the renders are cropped to keep the text on the page */
+.overview .body{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);column-gap:var(--g);align-items:start}
+.opt{position:relative;display:flex;flex-direction:column;min-width:0}
+.opt>figure{aspect-ratio:3/2;width:100%;max-height:440px}
+.opt .nm{display:flex;align-items:baseline;gap:20px;margin-top:32px}
+.opt .letter{font-size:72px}
+.opt h2{font-size:36px;font-weight:700;line-height:1.25;color:var(--ink-strong)}
+.opt .man{margin-top:20px;padding-top:20px;border-top:1px solid var(--line);font-size:var(--fs-body);font-weight:700;line-height:1.5;color:var(--ink-strong)}
+.opt .idea{margin-top:10px;font-size:var(--fs-small);line-height:1.65;color:var(--muted-text)}
+.opt.rec::before{content:var(--rec-label);position:absolute;top:0;left:0;z-index:4;padding:9px 18px;
+  background:var(--accent);color:var(--on-accent);font-size:var(--fs-micro);font-weight:700;letter-spacing:.14em;line-height:1.5}
+.opt.rec .man{border-top:2px solid var(--accent)}
+
+/* ---------- board (the benchmark concept page) ---------- */
+.board{display:grid;grid-template-columns:480px 1200px;column-gap:80px;padding:140px var(--m)}
+.board .txt{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.board .letter{font-size:var(--fs-display);margin-top:6px}
+.board .names{margin-top:auto}
+.board .name{font-size:var(--fs-name);font-weight:700;line-height:1.25;color:var(--ink-strong)}
+.board .rule-s{margin:36px 0 32px}
+.board .man{font-size:var(--fs-lead);font-weight:700;line-height:1.45;color:var(--ink-strong)}
+.board .para{margin-top:20px;font-size:20px;line-height:1.7;color:var(--muted-text)}
+.board>figure{width:1200px;height:800px;background:var(--surface)}
+.board>figure>img{object-fit:contain}
+.board.bleed{grid-template-columns:560px;padding:140px 0 140px var(--m)}
+.board.bleed>figure{position:absolute;top:0;right:0;bottom:0;left:720px;width:auto;height:auto}
+.board.bleed>figure>img{object-fit:cover}
+.board.bleed::after{right:auto;left:var(--m)}
+.board.mirror{grid-template-columns:1200px 480px}
+.board.mirror .txt{order:2}
+.board.mirror>figure{order:1}
+
+/* ---------- annotated (one render, numbered callouts pinned to it) ---------- */
+/* the figure keeps the render's 3:2 and takes the full body height; the text column takes the rest */
+.slide.annotated>.body{display:flex;column-gap:var(--g);align-items:stretch}
+figure.annotated{aspect-ratio:3/2;width:100%}
+.slide.annotated>.body>figure.annotated{flex:none;width:auto;height:100%;max-width:calc(100% - 420px)}
+figure.annotated .pin{position:absolute;z-index:4;transform:translate(-14px,-14px);display:flex;align-items:center;gap:10px}
+.pin .n{flex:none;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;
+  background:var(--accent);color:var(--on-accent);box-shadow:0 0 0 3px rgba(255,255,255,.88);
+  font-size:var(--fs-micro);font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.pin .call{padding:4px 10px;background:rgba(16,16,14,.72);color:#fff;font-size:var(--fs-label);line-height:1.5;letter-spacing:.02em;white-space:nowrap}
+/* the lead hangs from the figure's top edge, so the column reads with the title instead of under a void */
+.slide.annotated .side{flex:1 1 0;min-width:0;max-width:600px;align-self:flex-start;border-top:1px solid var(--ink-strong);padding-top:28px}
+.slide.annotated .side .lead{color:var(--ink-strong)}
+
+/* ---------- image (full-bleed render) ---------- */
+.image{padding:0}
+.image::before{content:none}
+.image>figure{position:absolute;inset:0}
+.image .cap{position:absolute;left:24px;bottom:22px;z-index:4;max-width:900px;padding:5px 12px;
+  font-size:var(--fs-micro);line-height:20px;letter-spacing:.06em;color:#fff;background:rgba(16,16,14,.5)}
+.image::after{top:22px;right:24px;bottom:auto;padding:2px 10px;color:#fff;background:rgba(16,16,14,.5)}
+
+/* ---------- stage (render contained on a dark page) ---------- */
+.stage{display:grid;grid-template-columns:1416px minmax(0,1fr);column-gap:var(--g);padding:64px var(--m);
+  background:var(--ink-strong);color:var(--paper);--chrome:rgba(255,255,255,.5)}
+.stage::before{content:none}
+.stage>figure{width:1416px;height:944px;background:transparent}
+.stage>figure>img{object-fit:contain}
+.stage .side{display:flex;flex-direction:column;min-height:0;overflow:hidden;padding-top:8px}
+.stage .letter{font-size:120px}
+.stage .side h2{margin-top:40px;font-size:var(--fs-h2);font-weight:700;line-height:1.3;color:var(--paper)}
+.stage .side .label{margin-top:14px;color:rgba(255,255,255,.6)}
+.stage .side .rule-s{margin:32px 0 24px;background:var(--accent)}
+.stage .side p.t{font-size:var(--fs-small);line-height:1.65;color:rgba(255,255,255,.76)}
+
+/* ---------- plan (drawing + key facts + numbered zones) ---------- */
+.plan .body{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);column-gap:var(--g)}
+.plan .body>figure{background:transparent}
+.plan .body>figure>img{object-position:left center;mix-blend-mode:multiply}
+.plan .side{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.plan .keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:24px;border-top:1px solid var(--ink-strong);padding-top:22px}
+.plan .keys>div{display:flex;flex-direction:column;min-width:0}
+.plan .keys b{display:block;font-size:44px;font-weight:300;line-height:1.1;color:var(--ink-strong);font-variant-numeric:lining-nums}
+.plan .keys .label{margin-top:auto;padding-top:10px;font-size:var(--fs-micro)}
+.plan .zones{margin-top:48px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--g)}
+.plan .zones li{display:grid;grid-template-columns:40px minmax(0,1fr);padding:14px 0 15px;border-top:1px solid var(--line)}
+.plan .zones .n{font-size:var(--fs-label);font-weight:700;color:var(--accent);line-height:30px;font-variant-numeric:tabular-nums}
+.plan .zones b{display:block;font-size:20px;line-height:30px;color:var(--ink-strong)}
+.plan .zones .d{display:block;font-size:var(--fs-label);line-height:1.5;color:var(--muted-text)}
+.plan .note{margin-top:auto;padding-top:24px;font-size:var(--fs-micro);line-height:1.6;color:var(--muted-text)}
+
+/* ---------- detail (experience moments, what it says, atmosphere) ---------- */
+.detail .body{display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:52px}
+.detail .moments{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:var(--g)}
+.detail .m{border-top:1px solid var(--ink-strong);padding-top:18px;min-width:0}
+.detail .m .at{font-size:36px;font-weight:300;line-height:1.15;color:var(--accent)}
+.detail .m .label{margin-top:4px;font-size:var(--fs-micro)}
+.detail .m .t{margin-top:14px;font-size:20px;line-height:1.6}
+/* the lower band sits on the bottom margin, like the cards grid: air between the bands, not under them */
+.detail .lower{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,4fr);column-gap:var(--g);align-items:start;align-self:end;min-height:0;max-height:100%}
+.detail .says{position:relative;padding:32px 40px 32px 44px;background:var(--surface);min-height:0;overflow:hidden}
+.detail .says::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+.detail .says h2{margin:12px 0 18px;font-size:var(--fs-h2);font-weight:700;line-height:1.35;color:var(--ink-strong)}
+.detail .says li{display:grid;grid-template-columns:36px minmax(0,1fr);padding:11px 0;border-top:1px solid var(--line);font-size:19px;line-height:1.55}
+.detail .says li .n{font-size:var(--fs-micro);font-weight:700;color:var(--accent);line-height:29px}
+.detail .atmos{min-height:0;overflow:hidden}
+.detail .sw{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:16px 0 18px}
+.detail .sw i{display:block;aspect-ratio:1/1;background:var(--c,var(--tint));box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.detail .sw span{display:block;margin-top:8px;font-size:var(--fs-micro);line-height:1.35;color:var(--ink)}
+.detail .sw code{display:block;font-family:inherit;font-size:12px;letter-spacing:.06em;color:var(--muted-text)}
+.detail .atmos .t{font-size:var(--fs-small);line-height:1.6}
+.detail .rows{margin-top:14px}
+.detail .rows>div{display:grid;grid-template-columns:120px minmax(0,1fr);column-gap:16px;padding:8px 0;border-top:1px solid var(--line);font-size:var(--fs-micro);line-height:1.5}
+.detail .rows dt{color:var(--muted-text);letter-spacing:.06em}
+.detail .rows dd{color:var(--ink-strong)}
+
+/* ---------- compare (one column per concept, strengths and next steps; recommended column highlighted) ---------- */
+.compare .cols{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);column-gap:var(--g);align-items:stretch}
+.cols>.col{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;padding:36px 40px 40px;border-top:1px solid var(--ink-strong)}
+.cols>.col .letter{font-size:72px}
+.cols>.col h2{margin-top:28px;font-size:36px;font-weight:700;line-height:1.25;color:var(--ink-strong)}
+.cols>.col .label{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);font-size:var(--fs-micro)}
+.cols>.col p:not(.label){margin-top:10px;font-size:20px;line-height:1.6;color:var(--ink)}
+.cols>.col.rec{background:var(--surface);box-shadow:inset 0 6px 0 var(--accent)}
+.cols>.col.rec::before{content:var(--rec-label);position:absolute;top:36px;right:40px;z-index:4;padding:6px 14px;
+  background:var(--accent);color:var(--on-accent);font-size:var(--fs-micro);font-weight:700;letter-spacing:.14em;line-height:1.5}
+.cols>.col.rec p:not(.label){color:var(--ink-strong)}
+
+/* ---------- flow (3–6 numbered steps, optional image) ---------- */
+.flow .body{display:flex;flex-direction:column;gap:56px}
+.flow .lead{max-width:1310px}
+.flow .steps{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);column-gap:var(--g);border-top:1px solid var(--line)}
+.flow .steps li{position:relative;padding-top:36px;min-width:0}
+.flow .steps li::before{content:"";position:absolute;top:-6px;left:0;width:11px;height:11px;border-radius:50%;background:var(--accent)}
+.flow .steps .n{font-size:56px;font-weight:300;line-height:1;color:var(--accent);font-variant-numeric:lining-nums}
+.flow .steps h3{margin-top:22px;font-size:28px;font-weight:700;line-height:1.35;color:var(--ink-strong)}
+.flow .steps p{margin-top:10px;font-size:19px;line-height:1.6;color:var(--muted-text)}
+.flow .body>figure,.flow .body>.placeholder{flex:1 1 auto;min-height:0}
+/* without a figure the steps turn into rows that share the body height: number, title, text on one line each */
+.flow .body:not(:has(>figure,>.placeholder)) .steps{flex:1 1 auto;min-height:0;grid-auto-flow:row;grid-auto-rows:minmax(0,1fr);border-top:0;border-bottom:1px solid var(--line)}
+.flow .body:not(:has(>figure,>.placeholder)) .steps li{display:grid;grid-template-columns:150px 420px minmax(0,1fr);column-gap:var(--g);align-items:baseline;align-content:center;padding:0;border-top:1px solid var(--line)}
+.flow .body:not(:has(>figure,>.placeholder)) .steps h3{margin:0;font-size:30px}
+.flow .body:not(:has(>figure,>.placeholder)) .steps p:not(.n){margin:0;font-size:var(--fs-body);line-height:1.55;color:var(--ink)}
+
+/* ---------- gallery (1–4 figures with captions) ---------- */
+.gallery .body{display:grid;column-gap:var(--g);row-gap:36px;align-content:center}
+.gallery .item{display:flex;flex-direction:column;min-width:0;min-height:0}
+.gallery .item>figure,.gallery .item>.placeholder{flex:1 1 auto;min-height:0}
+.gallery .item>figure.contain>img{object-position:left bottom}  /* letterboxed images sit on their caption */
+.gallery .cap{flex:none;margin-top:14px;font-size:var(--fs-label);line-height:1.5;color:var(--muted-text)}
+.gallery .cap b{margin-right:12px;color:var(--ink-strong)}
+.gallery.g1 .body{grid-template-columns:minmax(0,1fr);align-content:stretch}
+.gallery.g1 .item{display:grid;grid-template-columns:minmax(0,1fr) 400px;column-gap:var(--g);align-items:end}
+.gallery.g1 .item>figure,.gallery.g1 .item>.placeholder{height:100%}
+.gallery.g1 .cap{margin:0;padding-bottom:4px;font-size:var(--fs-small);line-height:1.6;border-top:1px solid var(--ink-strong);padding-top:18px}
+.gallery.g2 .body{grid-template-columns:repeat(2,minmax(0,1fr))}
+.gallery.g3 .body{grid-template-columns:repeat(3,minmax(0,1fr))}
+.gallery.g2 .item>figure,.gallery.g2 .item>.placeholder,
+.gallery.g3 .item>figure,.gallery.g3 .item>.placeholder{flex:none;aspect-ratio:3/2}
+.gallery.g4 .body{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));align-content:stretch;row-gap:var(--g)}
+/* 2 x 2: each cell is a small g1 (figure left, caption beside it on a rule), so a 3:2 image fills its cell */
+.gallery.g4 .item{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:var(--g);align-items:end}
+.gallery.g4 .item>figure,.gallery.g4 .item>.placeholder{height:100%}
+.gallery.g4 .cap{margin:0;padding-top:14px;border-top:1px solid var(--ink-strong)}
+
+/* ---------- table (long tables continue on the next slide: same title + the "cont" label) ---------- */
+.tbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:var(--fs-small);line-height:1.55}
+.tbl thead th{padding:0 24px 14px 0;border-bottom:1px solid var(--ink-strong);text-align:left;vertical-align:bottom;
+  font-size:var(--fs-micro);font-weight:400;letter-spacing:.14em;color:var(--muted-text)}
+.tbl td{padding:15px 24px 15px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink)}
+.tbl td.strong{color:var(--ink-strong);font-weight:700}
+.st{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;font-size:var(--fs-label)}
+.st::before{content:"";flex:none;width:10px;height:10px;border-radius:50%;background:currentColor}
+.st.met{color:var(--primary)}
+.st.part{color:var(--warn)}
+.st.not{color:var(--ink-strong)}
+.st.not::before{background:transparent;box-shadow:inset 0 0 0 2px currentColor}
+.table .foot{margin-top:20px;font-size:var(--fs-micro);color:var(--muted-text)}
+
+/* ---------- free (12-column grid utilities; token colours only) ---------- */
+.free .body,.grid12{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr));gap:var(--g)}
+.free .body>*{min-width:0;min-height:0}
+.span-1{grid-column-end:span 1}.span-2{grid-column-end:span 2}.span-3{grid-column-end:span 3}.span-4{grid-column-end:span 4}
+.span-5{grid-column-end:span 5}.span-6{grid-column-end:span 6}.span-7{grid-column-end:span 7}.span-8{grid-column-end:span 8}
+.span-9{grid-column-end:span 9}.span-10{grid-column-end:span 10}.span-11{grid-column-end:span 11}.span-12{grid-column-end:span 12}
+.col-1{grid-column-start:1}.col-2{grid-column-start:2}.col-3{grid-column-start:3}.col-4{grid-column-start:4}
+.col-5{grid-column-start:5}.col-6{grid-column-start:6}.col-7{grid-column-start:7}.col-8{grid-column-start:8}
+.col-9{grid-column-start:9}.col-10{grid-column-start:10}.col-11{grid-column-start:11}.col-12{grid-column-start:12}
+.row-1{grid-row-start:1}.row-2{grid-row-start:2}.row-3{grid-row-start:3}.row-4{grid-row-start:4}.row-5{grid-row-start:5}.row-6{grid-row-start:6}
+.rows-1{grid-row-end:span 1}.rows-2{grid-row-end:span 2}.rows-3{grid-row-end:span 3}.rows-4{grid-row-end:span 4}.rows-5{grid-row-end:span 5}.rows-6{grid-row-end:span 6}
+.self-start{align-self:start}.self-end{align-self:end}.self-center{align-self:center}
+.t-display{font-size:var(--fs-display);font-weight:300;line-height:.8}
+.t-cover{font-size:var(--fs-cover);font-weight:700;line-height:1.2}
+.t-title{font-size:var(--fs-title);font-weight:700;line-height:var(--lh-tight)}
+.t-h2{font-size:var(--fs-h2);font-weight:700;line-height:1.35}
+.t-h3{font-size:var(--fs-h3);font-weight:700;line-height:1.4}
+.t-lead{font-size:var(--fs-lead);line-height:1.55}
+.t-body{font-size:var(--fs-body);line-height:var(--lh-body)}
+.t-small{font-size:var(--fs-small);line-height:1.6}
+.t-label{font-size:var(--fs-label);letter-spacing:var(--track-label);text-transform:uppercase}
+.t-micro{font-size:var(--fs-micro);letter-spacing:.06em}
+.t-light{font-weight:300}.t-bold{font-weight:700}
+.c-ink{color:var(--ink)}.c-strong{color:var(--ink-strong)}.c-muted{color:var(--muted-text)}.c-primary{color:var(--primary)}
+.c-accent{color:var(--accent)}.c-extra{color:var(--brand-extra)}.c-paper{color:var(--paper)}
+.bg-paper{background:var(--paper)}.bg-surface{background:var(--surface)}.bg-tint{background:var(--tint)}
+.bg-primary{background:var(--primary);color:var(--paper)}.bg-ink{background:var(--ink-strong);color:var(--paper)}.bg-accent{background:var(--accent);color:var(--on-accent)}
+.pad{padding:var(--s5)}.pad-s{padding:var(--s4)}
+.bar{position:relative;padding-left:var(--s4)}.bar::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+.topline{border-top:1px solid var(--ink-strong);padding-top:var(--s3)}
+.mt-1{margin-top:var(--s1)}.mt-2{margin-top:var(--s2)}.mt-3{margin-top:var(--s3)}.mt-4{margin-top:var(--s4)}.mt-5{margin-top:var(--s5)}.mt-auto{margin-top:auto}
+.stack{display:flex;flex-direction:column;min-height:0}
+
+/* =====================================================================
+   5. LANGUAGE TUNING
+   ===================================================================== */
+:lang(en) .slide{line-height:1.5}
+:lang(en) .head .title,:lang(en) .cover .ctitle,:lang(en) .divider .dtitle{letter-spacing:-.005em}
+:lang(en) .statement .say{line-height:1.3;letter-spacing:-.005em}
+:lang(en) .card p,:lang(en) .opt .idea,:lang(en) .board .para{line-height:1.55}
+
+/* =====================================================================
+   6. VIEWER (screen) / SOLO / CHECK / PRINT
+   ===================================================================== */
+@media screen{
+  .slide{zoom:var(--zoom,1);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .is-todo{outline:1px dashed color-mix(in srgb,var(--warn) 70%,transparent);outline-offset:3px}
+}
+html.solo body{padding:0;background:var(--paper)}
+html.solo .slide{margin:0;box-shadow:none}
+html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
+#overflow-report{max-width:1920px;margin:0 auto 40px;padding:24px;font:13px/1.5 Consolas,monospace;white-space:pre-wrap;background:#fff}
+@page{size:1920px 1080px;margin:0}
+@media print{
+  html,body{margin:0;padding:0;background:none}
+  .slide{margin:0;box-shadow:none;break-after:page;page-break-after:always}
+  section.slide:last-of-type{break-after:auto;page-break-after:auto}
+  #overflow-report{display:none}
+}
+</style>
+</head>
+<body>
+
+<section class="slide cover bleed" data-id="cover" data-role="cover" data-covers="">
+  <figure class="render"><img data-img="render" alt="" src="../concepts/set-1/A/renders/hero-v1.png"></figure>
+  <div class="ct">
+    <div>
+      <p class="eyebrow" data-slot="eyebrow" data-max="54">Open timber lounge for visitors to rest</p>
+      <h1 class="ctitle" data-slot="title" data-max="32">Tidewater Pass</h1>
+      <p class="csub" data-slot="subtitle" data-max="65">A calm place in a busy hall</p>
+    </div>
+    <p class="meta" data-slot="meta" data-max="72">Open timber lounge for visitors to rest</p>
+  </div>
+</section>
+
+<section class="slide board" data-id="a-board" data-concept="A" data-role="board" data-covers="D1 D2">
+  <div class="txt">
+    <p class="letter">A</p>
+    <div class="names">
+      <h1 class="name" data-slot="name" data-max="14">Tidal Gate</h1>
+    </div>
+    <i class="rule-s"></i>
+    <p class="man" data-slot="manifesto" data-max="54">We kept the familiar curve and made it calmer.</p>
+    <p class="para" data-slot="para" data-max="180">This time the hull wall goes deeper and brighter than before. The gate opens onto the lounge.</p>
+  </div>
+  <figure class="render"><img data-img="render" alt="" src="../concepts/set-1/A/renders/hero-v1.png"></figure>
+</section>
+
+<section class="slide plan" data-id="a-plan" data-concept="A" data-role="plan" data-covers="D3 D4 D5 D6">
+  <header class="head"><span class="no">A</span><h1 class="title" data-slot="title" data-max="40">Open timber lounge for visitors to rest</h1></header>
+  <div class="body">
+    <figure class="pic contain"><img data-img="plan" alt="" src="../concepts/set-1/A/plan.png"></figure>
+    <div class="side">
+      <div class="keys">
+        <div><b data-slot="key1" data-max="18">Open timber lounge</b><p class="label" data-auto="chrome.size">Size</p></div>
+        <div><b data-slot="key2" data-max="18">Open timber lounge</b><p class="label" data-auto="chrome.highest_point">Highest point</p></div>
+        <div><b data-slot="key3" data-max="18">Open timber lounge</b><p class="label" data-auto="chrome.open_sides">Open sides</p></div>
+      </div>
+      <ol class="zones">
+        <li data-repeat="zone"><span class="n">01</span><div><b data-slot="z1" data-max="14">Open timber</b><span class="d" data-slot="z1-d" data-max="29">Open timber lounge for</span></div></li>
+        <li data-repeat="zone"><span class="n">02</span><div><b data-slot="z2" data-max="14">Open timber</b><span class="d" data-slot="z2-d" data-max="29">Open timber lounge for</span></div></li>
+        <li data-repeat="zone"><span class="n">03</span><div><b data-slot="z3" data-max="14">Open timber</b><span class="d" data-slot="z3-d" data-max="29">Open timber lounge for</span></div></li>
+        <li data-repeat="zone"><span class="n">04</span><div><b data-slot="z4" data-max="14">Open timber</b><span class="d" data-slot="z4-d" data-max="29">Open timber lounge for</span></div></li>
+        <li data-repeat="zone"><span class="n">05</span><div><b data-slot="z5" data-max="14">Open timber</b><span class="d" data-slot="z5-d" data-max="29">Open timber lounge for</span></div></li>
+        <li data-repeat="zone"><span class="n">06</span><div><b data-slot="z6" data-max="14">Open timber</b><span class="d" data-slot="z6-d" data-max="29">Open timber lounge for</span></div></li>
+      </ol>
+      <p class="note" data-slot="foot" data-max="108">Open timber lounge for visitors to rest</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide cards n3" data-id="a-story" data-role="text" data-covers="D7" data-concept="A">
+  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="40">What visitors notice</h1></header>
+  <div class="body">
+    <p class="lead" data-slot="lead" data-max="108">Three things stay with a visitor.</p>
+    <div class="grid">
+      <article class="card" data-repeat="card"><p class="num">01</p><div class="txt"><p class="k" data-slot="c1-k" data-max="22">Welcome</p><h3 data-slot="c1-title" data-max="25">A calm arrival</h3><p data-slot="c1-body" data-max="144">Visitors who knew the old blue hull will feel at home.</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">02</p><div class="txt"><p class="k" data-slot="c2-k" data-max="22">Rest</p><h3 data-slot="c2-title" data-max="25">A place to sit</h3><p data-slot="c2-body" data-max="144">It builds on the stand people already know.</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">03</p><div class="txt"><p class="k" data-slot="c3-k" data-max="22">Take away</p><h3 data-slot="c3-title" data-max="25">A small giveaway</h3><p data-slot="c3-body" data-max="144">Every visitor leaves with a pass holder in signal yellow.</p></div></article>
+    </div>
+  </div>
+</section>
+
+<section class="slide statement" data-id="a-palette" data-role="text" data-covers="" data-concept="A">
+  <div class="body">
+    <p class="tag label acc" data-slot="label" data-max="22">Palette</p>
+    <p class="say" data-slot="statement" data-max="86">The palette carries forward Nordvik's Signal Yellow.</p>
+    <p class="by" data-slot="by" data-max="90">Colour decision</p>
+  </div>
+</section>
+
+<section class="slide free" data-id="a-site" data-role="text" data-covers="" data-concept="A">
+  <header class="head"><span class="no">06</span><h1 class="title" data-slot="title" data-max="40">A moment from the hall</h1></header>
+  <div class="body">
+    <figure class="pic col-1 span-7 row-1 rows-6"><img data-img="plan" alt="" src="../input/refs/set-1/r01.png"></figure>
+    <div class="col-8 span-5 row-1 rows-3 stack topline">
+      <p class="t-label c-accent t-bold" data-slot="k" data-max="22">Hall</p>
+      <p class="t-h2 c-strong mt-2" data-slot="h" data-max="36">Open and calm</p>
+      <p class="t-body mt-2" data-slot="p" data-max="126">Visitors walk straight in.</p>
+    </div>
+    <div class="col-8 span-5 row-4 rows-3 bg-surface pad bar stack">
+      <p class="t-display c-accent" data-slot="big" data-max="5">Calm</p><!-- a number or one short word -->
+      <p class="t-small c-muted mt-auto" data-slot="big-d" data-max="54">The feeling we want.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide divider" data-id="a-divider" data-role="divider" data-covers="" style="background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==)">
+  <div class="body">
+    <p class="dno">01</p>
+    <div class="dt">
+      <h1 class="dtitle" data-slot="title" data-max="22">Thank you</h1>
+      <p class="dsub" data-slot="sub" data-max="72">We look forward to the conversation.</p>
+    </div>
+  </div>
+</section>
+
+<script id="viewer">
+(function () {
+  var doc = document.documentElement;
+  var q = new URLSearchParams(location.search);
+  var slides = Array.prototype.slice.call(document.querySelectorAll('section.slide'));
+  var solo = parseInt(q.get('slide') || '', 10);
+  var check = q.has('check');
+
+  slides.forEach(function (s) {
+    Array.prototype.forEach.call(s.querySelectorAll('[data-slot]'), function (el) {
+      if (/^\s*TODO\b/.test(el.textContent)) el.classList.add('is-todo');
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('figure.annotated .pin[data-x][data-y]'), function (p) {
+    p.style.left = parseFloat(p.getAttribute('data-x')) + '%';
+    p.style.top = parseFloat(p.getAttribute('data-y')) + '%';
+  });
+
+  if (solo >= 1 && solo <= slides.length) {
+    doc.classList.add('solo');
+    slides.forEach(function (s, i) { if (i !== solo - 1) s.style.display = 'none'; });
+    document.body.style.counterReset = 'page ' + (solo - 1);
+  }
+
+  function fit() {
+    var z = 1;
+    if (!doc.classList.contains('solo') && !check) z = Math.min(1, (doc.clientWidth - 64) / 1920);
+    doc.style.setProperty('--zoom', String(z));
+  }
+  fit();
+  window.addEventListener('resize', fit);
+
+  if (!check) return;
+  doc.classList.add('checking');
+
+  function imagesLoaded() {
+    return Promise.all(Array.prototype.map.call(document.images, function (img) {
+      if (img.complete) return 0;
+      return new Promise(function (r) { img.addEventListener('load', r); img.addEventListener('error', r); });
+    }));
+  }
+  function clips(cs) { return cs.overflowX !== 'visible' || cs.overflowY !== 'visible'; }
+  function run() {
+    var out = [];
+    slides.forEach(function (s, i) {
+      if (s.style.display === 'none') return;
+      Array.prototype.forEach.call(s.querySelectorAll('[data-slot]'), function (el) {
+        var cs = getComputedStyle(el);
+        if (cs.display === 'none') return;
+        var ov = 0;
+        if (cs.display !== 'inline') {
+          // glyphs of tight-leading CJK lines poke out of their line box by < 0.3em; a real overflow is a whole line
+          var own = Math.max(el.scrollHeight - el.clientHeight, el.scrollWidth - el.clientWidth);
+          if (own > Math.max(2, 0.3 * (parseFloat(cs.fontSize) || 16))) ov = own;
+        }
+        var r = el.getBoundingClientRect();
+        for (var p = el.parentElement; p; p = p.parentElement) {
+          if (p === s || clips(getComputedStyle(p))) {
+            var pr = p.getBoundingClientRect();
+            ov = Math.max(ov, r.bottom - pr.bottom, r.right - pr.right, pr.top - r.top, pr.left - r.left);
+          }
+          if (p === s) break;
+        }
+        ov = Math.round(ov);
+        if (ov > 1) {
+          el.classList.add('is-over');
+          out.push({ slide: i + 1, id: s.getAttribute('data-id') || '', slot: el.getAttribute('data-slot'), overflow_px: ov });
+        }
+      });
+    });
+    var pre = document.createElement('pre');
+    pre.id = 'overflow-report';
+    pre.textContent = JSON.stringify(out);
+    document.body.appendChild(pre);
+  }
+  Promise.all([document.fonts ? document.fonts.ready : 0, imagesLoaded()]).then(function () { setTimeout(run, 60); });
+})();
+</script>
+</body>
+</html>

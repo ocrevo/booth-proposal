@@ -1,6 +1,8 @@
 schema_version: "1.1"
 name: us-inline-line-of-sight
 expected_outcome: |
-  Geometry specs in feet with a height zone limiting the front 5 ft to 4 ft, rigging_allowed false and the program in
-  required; every concept passes; at least one idea uses the low-front, tall-back rule creatively; dimensions in feet
-  with metres in brackets.
+  Geometry specs in feet (unit "ft", 10 x 10, max_height 8) with a height_zones entry limiting the front 5 ft of the
+  booth (y from 5 to 10 ft, measured from the back wall) to 4 ft, rigging_allowed false and the program (demo table,
+  screen, tablet, storage) in required; `booth_geometry.py check` passes for every concept; at least one idea uses
+  the low-front, tall-back rule creatively; dimensions are given in feet with metres in brackets. No image API call is
+  made.

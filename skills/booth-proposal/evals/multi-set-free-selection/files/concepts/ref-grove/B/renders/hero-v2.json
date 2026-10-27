@@ -1,0 +1,29 @@
+{
+  "schema": "sidecar/2",
+  "tool": "render.py",
+  "mode": "import",
+  "set": "ref-grove",
+  "concept": "B",
+  "inputs": [
+    {
+      "role": "ref",
+      "path": "input/refs/ref-grove/r01.png",
+      "sha256": "a34f77c13ad09b3a66c0fc6271966ff9f6057ef31f5217fc64942117b8d37ea9"
+    },
+    {
+      "role": "ref",
+      "path": "input/refs/ref-grove/r02.png",
+      "sha256": "adaa6ca6d62d9d7eba661ab070697805c5ccd2c7c71e3bf1256effa367d901e2"
+    }
+  ],
+  "prompt_sha256": "7fba90138f915abdf6827b779b0e508b6c792ce2612a927d9685608bf58805aa",
+  "lint": {
+    "status": "pass",
+    "codes": []
+  },
+  "api": null,
+  "outputs": {
+    "hero-v2.png": "4aa5c1c3475f4009d26ef22e73c3865229c023601e193172df7a1871ff3efbe4"
+  },
+  "created_at": "2026-10-01T09:00:12+02:00"
+}

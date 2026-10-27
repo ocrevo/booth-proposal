@@ -4,4 +4,4 @@ focus: trace
 weight: 1
 ---
 
-Missing information (which aisle is the main one, the brand guidelines that were not attached) becomes assumptions with a basis and an impact level, not questions, and the run pauses only because step mode was requested.
+The open sides, which section 3.2 of the RFP leaves unconfirmed, are recorded in `assumptions` with `impact: "high"`, and rigging stays unconfirmed: wherever brief.json has a `booth` block, `rigging_allowed` is `null`, never true or false.

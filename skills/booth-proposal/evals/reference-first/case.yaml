@@ -1,12 +1,15 @@
 schema_version: "1.1"
 name: reference-first
 expected_outcome: |
-  The client's previous stand (previous-stand.png, a deep green arch) is a design input. The skill
-  looks at the image and names what the client loves in it. Concepts may evolve the arch (the RFP asks to build on
-  what people recognise), each pushed in a different direction and made clearly more premium, and at least one
-  concept starts from somewhere else. Every View 1 render command (or the prompt pack) attaches previous-stand.png
-  as a reference image (render.py hero --ref), and each View 1 prompt carries one short line on what to keep and
-  evolve and what not to copy, with no written description standing in for the image. The proposal never shows
-  previous-stand.png and never narrates it: each concept is described on its own merit.
+  The client's previous stand, two photos in input/refs/ref-prev/ known for a deep blue curved hull wall, is a reference
+  set; the logo in input/ is client material, not a reference. `start` runs steps 1 to 4. The concepts of the set may
+  evolve the hull wall, each made clearly more premium, and the chosen ideas differ in booth type; nothing asks a
+  concept to start elsewhere. Every hero call attaches both photos (`--ref input/refs/ref-prev/stand-1.png --ref
+  input/refs/ref-prev/stand-2.png`) and never the logo, a render, a massing image or a plan. Each prompt follows the
+  template, keeps the plain logo panel, is free of the client's names, Tidewater Pass, digits outside the Size lines and the
+  HEX codes of the Brand colours line, quote marks, and passes `render.py lint`. Candidates are reviewed and one is
+  chosen per concept; the set's candidate board (`render.py sheet --set ref-prev --candidates`) and the overview (`render.py sheet --chosen-all`) are shown, and
+  the run stops and asks the user to select. It does not run `gates.py select` and does no step 5 or 6 work. This case
+  makes paid image calls.
 context:
   scaffold_script: place-files.sh

@@ -1,8 +1,13 @@
 schema_version: "1.1"
 name: brief-from-rfp
 expected_outcome: |
-  In step mode the skill stops after step 1 with a requirement card and assumptions: 6 m x 4 m corner stand open
-  front and right, max 4.5 m, no hanging, the full program with sources, deliverables with schedule and price out of
-  scope, and assumptions (with basis and impact) instead of questions. Nothing is invented.
+  In step mode the skill runs step 1 and stops. It writes brief/brief.json with Nordvik Ferries in client.names and
+  Tidewater Pass in protected_terms; design points for the theme "crossings made calm", the Tidewater Pass sign-up
+  counter, the large screen for route films, the lounge for eight and the giveaway, each citing its RFP section; and
+  claims copied verbatim from the fleet brochure with their page as source, the vessel count and the "first fully
+  electric car ferry" superlative flagged for sign-off. The open sides, which the RFP leaves unconfirmed, become a
+  high-impact assumption instead of a question, and rigging stays unconfirmed (rigging_allowed null wherever the booth
+  block is written). `gates.py brief --stamp` passes; the user sees `gates.py report brief` plus the assumption that
+  could change the design most. No ideas, prompts or concept folders exist yet, and nothing is invented.
 context:
   scaffold_script: place-files.sh

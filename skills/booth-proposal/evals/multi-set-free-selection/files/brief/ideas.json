@@ -1,0 +1,64 @@
+{
+  "schema": "ideas/1",
+  "insights": [
+    {
+      "id": "I1",
+      "text": "Crossings are remembered as thresholds that visitors pass",
+      "source": "D1"
+    }
+  ],
+  "sets": [
+    {
+      "set": "ref-north",
+      "ideas": [
+        {
+          "id": "A",
+          "name": "Tidal Gate",
+          "idea": "A deep gate of layered blue ribs that visitors walk through into a calm lounge",
+          "booth_type": "a gate you walk through",
+          "chosen": true
+        },
+        {
+          "id": "B",
+          "name": "Ferry Room",
+          "idea": "A calm room with a low ceiling of paper lanterns and a long bench",
+          "booth_type": "a room you step into",
+          "chosen": true
+        },
+        {
+          "id": "C",
+          "name": "Pier",
+          "idea": "A long jetty of pale boards leading to a counter",
+          "booth_type": "a facade you face",
+          "chosen": false
+        }
+      ]
+    },
+    {
+      "set": "ref-grove",
+      "ideas": [
+        {
+          "id": "A",
+          "name": "Canopy",
+          "idea": "A floating canopy over a ring of benches",
+          "booth_type": "a roof you stand under",
+          "chosen": true
+        },
+        {
+          "id": "B",
+          "name": "Lantern Hull",
+          "idea": "A hull of lanterns that visitors walk around",
+          "booth_type": "an object you walk around",
+          "chosen": true
+        },
+        {
+          "id": "C",
+          "name": "Pier",
+          "idea": "A long jetty of pale boards leading to a counter",
+          "booth_type": "a facade you face",
+          "chosen": false
+        }
+      ]
+    }
+  ]
+}

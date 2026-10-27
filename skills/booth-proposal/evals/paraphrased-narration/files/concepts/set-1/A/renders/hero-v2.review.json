@@ -1,0 +1,34 @@
+{
+  "schema": "review/1",
+  "image": "hero-v2.png",
+  "sha256": "35ac7bec8c52461734f157c69c3505c91976ec8d69365f86044097d83f4342b6",
+  "set": "set-1",
+  "concept": "A",
+  "scope": "whole",
+  "marks": [],
+  "size": {
+    "expected": {
+      "w": 4.571,
+      "d": 3.429,
+      "h": 2.571
+    },
+    "observed": {
+      "w": 4.6,
+      "d": 3.4,
+      "h": 2.5
+    },
+    "deviation": {
+      "w": 0.006,
+      "d": 0.008,
+      "h": -0.028
+    },
+    "within": true
+  },
+  "premium": true,
+  "reviewer_verdict": "pass",
+  "verdict": "pass",
+  "reviewer": "subagent",
+  "notes": "",
+  "inherited_from": null,
+  "reviewed_at": "2026-10-01T09:00:05+02:00"
+}

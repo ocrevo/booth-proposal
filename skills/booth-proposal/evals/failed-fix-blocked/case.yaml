@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: failed-fix-blocked
+expected_outcome: |
+  The project is finished up to step 5: set-1/A is selected and lead, with geometry and plan. Its `chosen:` render,
+  hero-v1.png, has a review with a legible_text mark and verdict fail; hero-v2.png, not chosen, already has a current
+  passing review of scope full. Asked to continue to the export, the skill finds that `gates.py renders` fails
+  (G-REVIEW) and never places hero-v1. Any of these is correct: it moves `chosen:` to hero-v2.png (a current full
+  passing review is already on file; it may re-review it to be sure), it blocks hero-v1 (`blocked: renders/hero-v1.png`)
+  and chooses hero-v2, or it re-reviews or fixes or regenerates. If a fix call is made and fails (for example R-API,
+  exit 3, with no key) it is reported to the user, not retried in a loop. hero-v1.review.json is never rewritten. The
+  proposal is then built, checked, rendered, reviewed in two passes and exported to pack/proposal.pdf with a render that
+  has a current full passing review.
+context:
+  scaffold_script: place-files.sh

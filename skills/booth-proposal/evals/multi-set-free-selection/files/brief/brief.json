@@ -1,0 +1,137 @@
+{
+  "schema": "brief/2",
+  "lang": "zh",
+  "client": {
+    "names": [
+      "Nordvik Ferries",
+      "Nordvik"
+    ]
+  },
+  "protected_terms": [
+    "Tidewater Pass"
+  ],
+  "do_not_mention": [
+    "last season's stand"
+  ],
+  "booth": {
+    "unit": "m",
+    "width": 8,
+    "depth": 6,
+    "max_height": 4.5,
+    "open_sides": [
+      "front",
+      "right"
+    ],
+    "source": "RFP §3.2",
+    "rigging_allowed": null
+  },
+  "design_points": [
+    {
+      "id": "D1",
+      "type": "space",
+      "text": "Open, walk-in stand",
+      "source": "RFP §2.1"
+    },
+    {
+      "id": "D2",
+      "type": "theme",
+      "text": "Crossings made calm",
+      "source": "RFP §2.1"
+    },
+    {
+      "id": "D3",
+      "type": "function",
+      "text": "Tidewater Pass sign-up counter",
+      "source": "RFP §4.1"
+    },
+    {
+      "id": "D4",
+      "type": "media",
+      "text": "Large screen for route films",
+      "source": "RFP §4.2"
+    },
+    {
+      "id": "D5",
+      "type": "function",
+      "text": "Lounge that seats eight",
+      "source": "RFP §4.3"
+    },
+    {
+      "id": "D6",
+      "type": "function",
+      "text": "Storage",
+      "source": "RFP §4.4"
+    },
+    {
+      "id": "D7",
+      "type": "function",
+      "text": "A giveaway for visitors",
+      "source": "RFP §4.5"
+    }
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "text": "14 hybrid vessels in service",
+      "flag": true,
+      "source": "Fleet brochure p.4"
+    },
+    {
+      "id": "C2",
+      "text": "The first fully electric car ferry on the northern coast",
+      "flag": true,
+      "source": "Fleet brochure p.4"
+    },
+    {
+      "id": "C3",
+      "text": "Founded in 1931",
+      "flag": false,
+      "source": "Fleet brochure p.2"
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A1",
+      "text": "The open sides are front and right; the organiser has not confirmed them",
+      "impact": "high"
+    },
+    {
+      "id": "A2",
+      "text": "Nothing may be hung from the hall ceiling until the organiser confirms rigging",
+      "impact": "high"
+    }
+  ],
+  "references": {
+    "sets": [
+      {
+        "id": "ref-grove",
+        "dir": "input/refs/ref-grove",
+        "files": [
+          {
+            "path": "input/refs/ref-grove/r01.png",
+            "sha256": "a34f77c13ad09b3a66c0fc6271966ff9f6057ef31f5217fc64942117b8d37ea9"
+          },
+          {
+            "path": "input/refs/ref-grove/r02.png",
+            "sha256": "adaa6ca6d62d9d7eba661ab070697805c5ccd2c7c71e3bf1256effa367d901e2"
+          }
+        ]
+      },
+      {
+        "id": "ref-north",
+        "dir": "input/refs/ref-north",
+        "files": [
+          {
+            "path": "input/refs/ref-north/r01.png",
+            "sha256": "267a7665d40d9eca3ddd9d465c8deafb35896aca4b634a9c340a070a5d46744e"
+          },
+          {
+            "path": "input/refs/ref-north/r02.png",
+            "sha256": "d907727a5dfbd960b0722c8c89ce539d2b883675e9ff6df2ac0e3ee1d862b314"
+          }
+        ]
+      }
+    ],
+    "stamped_at": "2026-10-01T09:00:01+02:00"
+  }
+}

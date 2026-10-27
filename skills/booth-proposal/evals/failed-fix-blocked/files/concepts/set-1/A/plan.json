@@ -1,0 +1,21 @@
+{
+  "schema": "sidecar/2",
+  "tool": "draw_plan.py",
+  "mode": "plan",
+  "set": "set-1",
+  "concept": "A",
+  "inputs": [
+    {
+      "role": "spec",
+      "path": "concepts/set-1/A/geometry.json",
+      "sha256": "2302170ff7ee0aa4956dd098bc9588cdb1bedb3c69cd85b3776706c65ce07a98"
+    }
+  ],
+  "prompt_sha256": null,
+  "lint": null,
+  "outputs": {
+    "plan.png": "758146e9416a86d3306aa70d1ca19df7924a82c20ce944cd9a5bde4d2bcd1ee4",
+    "plan.svg": "965b43007438137e2fd9bc0306d4ba314c6b72a71a4c41b293ee6e84e6dcc6ea"
+  },
+  "created_at": "2026-10-01T09:00:07+02:00"
+}

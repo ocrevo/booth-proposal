@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: multi-set-free-selection
+expected_outcome: |
+  Two reference sets (ref-north, ref-grove) with concepts A and B in each; every chosen render has a current full
+  passing review. The user selects ref-grove/B and ref-north/A, with ref-north/A as lead. The skill runs
+  `gates.py select ref-grove/B ref-north/A --lead ref-north/A` (display letters: ref-grove/B is A, ref-north/A is B),
+  develops only these two concepts (geometry.json, `booth_geometry.py check`, `draw_plan.py plan`, `gates.py concepts`),
+  shows the storyboard table (deck/storyboard.md) before writing any HTML, and builds pack/proposal.html from the
+  template with only the two selected concepts and ref-north/A as the recommended lead. Flagged claims carry the
+  sign-off tag and are listed on the sign-off page. It runs `deck.py check` and `deck.py render` until there are no
+  errors and no overflow, records Pass 1 and Pass 2 with `deck.py review --record`, exports pack/proposal.pdf and tells
+  the user to send only that file. No page shows an ID, a file name, a set name, a TODO or a placeholder, and pack/
+  holds only whitelisted files.
+context:
+  scaffold_script: place-files.sh

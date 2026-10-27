@@ -4,4 +4,4 @@ focus: trace
 weight: 1
 ---
 
-Every View 1 render command attaches the reference image file (`render.py hero ... --ref previous-stand.png`, or the same file listed as an attachment in the prompt pack). No View 1 call is made without it, and no massing image or plan is attached.
+Every `render.py hero` call attaches both photos of the set, `--ref input/refs/ref-prev/stand-1.png --ref input/refs/ref-prev/stand-2.png`, and never input/nordvik-logo.png, a render, a massing image or a plan.

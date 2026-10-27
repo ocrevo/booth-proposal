@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: no-key
+expected_outcome: |
+  `start` runs steps 1 to 4 for Ostara Coffee and shows each stage. The user says there is no image API key, so the
+  skill makes no paid call: it writes and lints a hero prompt for every chosen idea and prepares the
+  `render.py hero ... --dry-run` lines with the set's photos. It tells the user how to add the key (a line
+  OPENAI_API_KEY=... in a .env file in the project folder or a parent, or the environment variable) and how to bring
+  images made elsewhere in with `render.py import FILE --concept <set>/<id>`. With no render there is nothing to select:
+  `start` ends after step 4 with the prompt files, the dry-run lines and the import instructions, writes no
+  brief/selection.json and does no step 5 or 6 work.
+context:
+  scaffold_script: place-files.sh

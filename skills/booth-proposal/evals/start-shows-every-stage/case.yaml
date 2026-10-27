@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: start-shows-every-stage
+expected_outcome: |
+  `start` runs steps 1 to 4 for Ostara Coffee and shows each stage's result before going on, without asking for
+  confirmation: the brief report (`gates.py report brief`), the booth in three lines (6 m x 4 m, at most 4 m, open front
+  and left, no hanging), the idea board of each set with the render cost (`gates.py report ideas`), then the lint and
+  dry-run results. Both reference sets get ideas, and the chosen ideas of one set differ in booth type. Every chosen
+  idea gets concepts/<set>/<id>/prompts/hero.txt in the shape of the prompt template (Idea, Brand colours, the Size
+  header with three lines, Essentials, the fixed sentences) with no material or light instructions and no client or
+  product name; `render.py lint` passes on each. Each `render.py hero ... --dry-run` attaches every photo of the
+  concept's own set and none of the other set. No image API call is made and no render exists; the run stops after
+  the dry runs, as the user asked.
+context:
+  scaffold_script: place-files.sh

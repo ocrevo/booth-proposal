@@ -1,0 +1,11 @@
+{
+  "schema": "selection/1",
+  "selected": [
+    "set-1/A"
+  ],
+  "lead": "set-1/A",
+  "display": {
+    "set-1/A": "A"
+  },
+  "updated_at": "2026-10-01T09:00:06+02:00"
+}

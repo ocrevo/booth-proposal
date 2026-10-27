@@ -1,7 +1,8 @@
 schema_version: "1.1"
 name: geometry-conflict-caught
 expected_outcome: |
-  The skill sizes the idea against the frame (or runs the geometry check) and finds that six 0.7 m steps in the depth
-  direction need 4.2 m and cannot fit 3 m. It changes the design (steps along the width, fewer or shallower steps),
-  keeps room for the table and counter, writes a geometry spec whose check passes, and the final short View 1 prompt
-  and renders show the corrected design; anything rendered before the fix is rendered again.
+  The skill sizes the idea against the frame (rough sizing, or `booth_geometry.py check` on a geometry spec) and finds
+  that six 0.7 m steps in the depth direction need 4.2 m and cannot fit 3 m. It changes the design (steps along the
+  width, fewer or shallower steps), keeps room for the table and counter, writes a geometry spec for the corrected
+  design whose `booth_geometry.py check` ends in RESULT: PASS, and the final hero prompt describes the corrected
+  design; any prompt written before the fix is rewritten. No image API call is made.

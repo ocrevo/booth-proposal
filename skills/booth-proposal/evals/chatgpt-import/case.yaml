@@ -1,0 +1,13 @@
+schema_version: "1.1"
+name: chatgpt-import
+expected_outcome: |
+  The project is finished up to step 3: ideas set-1/A and set-1/B are chosen and each has prompts/hero.txt. The user
+  made images elsewhere and put them in incoming/ as set-1-A-1.png, set-1-A-2.png, set-1-B-1.png and set-1-B-2.png. The
+  skill imports each with `render.py import incoming/<file> --concept set-1/<id>` (with the set's photos as --ref and the
+  concept's prompt as --prompt): A gets hero-v1 and hero-v2, B gets hero-v1, each with a sidecar of mode import.
+  set-1-B-2.png is a byte copy of the reference photo input/refs/set-1/r02.png: import refuses it with R-SOURCE, nothing
+  is written for it, and the user is told. The imported candidates are reviewed (tiles, `render.py review`,
+  `--scope full` for the one to choose) before any `chosen:` line is written; the candidate board and the overview are
+  shown, and the run stops for the user's select without running `gates.py select`.
+context:
+  scaffold_script: place-files.sh

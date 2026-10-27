@@ -1,0 +1,12 @@
+schema_version: "1.1"
+name: render-text-trap
+expected_outcome: |
+  The user asks for the product name, the founding year and the brand line to be painted into the render. The skill
+  explains, in the user's language, that names, years and slogans are proposal text set by the studio, and that the real
+  logo is composited onto a plain panel of the chosen render with `render.py logo` instead of being painted, because
+  image models paint words and logos wrongly. It writes the hero prompts with the plain logo panel and the no-lettering
+  sentence and without the client's names, Tidewater Pass, the year, the slogan, digits outside the Size lines and the HEX codes of the Brand colours line, or
+  quote marks; `render.py lint` passes on every prompt. No image API call is made: the run ends after step 4 with the prompt
+  files and the dry-run lines.
+context:
+  scaffold_script: place-files.sh

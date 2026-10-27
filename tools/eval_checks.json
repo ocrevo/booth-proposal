@@ -1,0 +1,71 @@
+{
+  "schema": "eval-checks/1",
+  "cases": {
+    "brief-from-rfp": [
+      {"id": "brief-from-rfp-01", "type": "exists", "path": "brief/brief.json"},
+      {"id": "brief-from-rfp-02", "type": "command", "argv": ["{py}", "{scripts}/gates.py", "brief", "--json", "--project", "{ws}"], "exit": [0]},
+      {"id": "brief-from-rfp-03", "type": "absent", "path": "brief/ideas.json"},
+      {"id": "brief-from-rfp-04", "type": "absent", "path": "concepts"}
+    ],
+    "start-shows-every-stage": [
+      {"id": "start-shows-every-stage-01", "type": "command", "argv": ["{py}", "{scripts}/gates.py", "ideas", "--json", "--project", "{ws}"], "exit": [0]},
+      {"id": "start-shows-every-stage-02", "type": "lint_all", "glob": "concepts/*/*/prompts/*.txt"},
+      {"id": "start-shows-every-stage-03", "type": "absent", "path": "concepts/*/*/renders/*.png"}
+    ],
+    "geometry-conflict-caught": [
+      {"id": "geometry-conflict-caught-01", "type": "geometry_all", "glob": "**/geometry.json"}
+    ],
+    "us-inline-line-of-sight": [
+      {"id": "us-inline-line-of-sight-01", "type": "geometry_all", "glob": "**/geometry.json"}
+    ],
+    "reference-first": [
+      {"id": "reference-first-01", "type": "lint_all", "glob": "concepts/*/*/prompts/*.txt"},
+      {"id": "reference-first-02", "type": "exists", "path": "work/sheets/ref-prev-candidates.png"},
+      {"id": "reference-first-03", "type": "exists", "path": "work/sheets/chosen-all.png"},
+      {"id": "reference-first-04", "type": "absent", "path": "brief/selection.json"},
+      {"id": "reference-first-05", "type": "absent", "path": "pack/proposal.html"}
+    ],
+    "render-text-trap": [
+      {"id": "render-text-trap-01", "type": "lint_all", "glob": "concepts/*/*/prompts/*.txt"},
+      {"id": "render-text-trap-02", "type": "absent", "path": "concepts/*/*/renders/*.png"}
+    ],
+    "failed-fix-blocked": [
+      {"id": "failed-fix-blocked-01", "type": "unchanged", "path": "concepts/set-1/A/renders/hero-v1.review.json"},
+      {"id": "failed-fix-blocked-02", "type": "command", "argv": ["{py}", "{scripts}/gates.py", "renders", "--json", "--project", "{ws}"], "exit": [0]},
+      {"id": "failed-fix-blocked-03", "type": "check_clean"},
+      {"id": "failed-fix-blocked-04", "type": "exists", "path": "pack/proposal.pdf"}
+    ],
+    "paraphrased-narration": [
+      {"id": "paraphrased-narration-01", "type": "text", "absent": ["This time the hull wall goes deeper and brighter than before.", "Visitors who knew the old blue hull will feel at home.", "We kept the familiar curve and made it calmer.", "It builds on the stand people already know."], "present": ["Signal Yellow"]},
+      {"id": "paraphrased-narration-02", "type": "check_clean", "codes": ["D-IMG-FORBIDDEN", "D-IMG-URL", "D-TXT-REFERENCE"]},
+      {"id": "paraphrased-narration-03", "type": "exists", "path": "work/deck-review.json"}
+    ],
+    "no-key": [
+      {"id": "no-key-01", "type": "absent", "path": "brief/selection.json"},
+      {"id": "no-key-02", "type": "absent", "path": "concepts/*/*/renders/*.png"},
+      {"id": "no-key-03", "type": "lint_all", "glob": "concepts/*/*/prompts/*.txt"}
+    ],
+    "chatgpt-import": [
+      {"id": "chatgpt-import-01", "type": "json_equals", "path": "concepts/set-1/A/renders/hero-v1.json", "key": "mode", "value": "import"},
+      {"id": "chatgpt-import-02", "type": "json_equals", "path": "concepts/set-1/A/renders/hero-v2.json", "key": "mode", "value": "import"},
+      {"id": "chatgpt-import-03", "type": "json_equals", "path": "concepts/set-1/B/renders/hero-v1.json", "key": "mode", "value": "import"},
+      {"id": "chatgpt-import-04", "type": "absent", "path": "concepts/set-1/B/renders/hero-v2.*"},
+      {"id": "chatgpt-import-05", "type": "absent", "path": "brief/selection.json"}
+    ],
+    "multi-set-free-selection": [
+      {"id": "multi-set-free-selection-01", "type": "json_equals", "path": "brief/selection.json", "key": "selected", "value": ["ref-grove/B", "ref-north/A"]},
+      {"id": "multi-set-free-selection-02", "type": "json_equals", "path": "brief/selection.json", "key": "lead", "value": "ref-north/A"},
+      {"id": "multi-set-free-selection-03", "type": "json_equals", "path": "brief/selection.json", "key": "display", "value": {"ref-grove/B": "A", "ref-north/A": "B"}},
+      {"id": "multi-set-free-selection-04", "type": "exists", "path": "concepts/ref-grove/B/geometry.json"},
+      {"id": "multi-set-free-selection-05", "type": "exists", "path": "concepts/ref-north/A/geometry.json"},
+      {"id": "multi-set-free-selection-06", "type": "absent", "path": "concepts/ref-grove/A/geometry.json"},
+      {"id": "multi-set-free-selection-07", "type": "absent", "path": "concepts/ref-north/B/geometry.json"},
+      {"id": "multi-set-free-selection-08", "type": "text", "absent": ["ref-grove", "ref-north"]},
+      {"id": "multi-set-free-selection-09", "type": "check_clean", "codes": ["D-IMG-RENDER", "D-TXT-INTERNAL", "D-STRUCT"]},
+      {"id": "multi-set-free-selection-10", "type": "pack_only"},
+      {"id": "multi-set-free-selection-11", "type": "exists", "path": "pack/proposal.pdf"},
+      {"id": "multi-set-free-selection-12", "type": "exists", "path": "deck/storyboard.md"},
+      {"id": "multi-set-free-selection-13", "type": "exists", "path": "work/deck-review.json"}
+    ]
+  }
+}

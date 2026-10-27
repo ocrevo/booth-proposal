@@ -1,0 +1,40 @@
+{
+  "schema": "review/1",
+  "image": "hero-v1.png",
+  "sha256": "656cf0bce830bb555922ff8c3abf77280bf27d82b59602faa525b48e5ec4b10c",
+  "set": "set-1",
+  "concept": "A",
+  "scope": "full",
+  "marks": [
+    {
+      "type": "legible_text",
+      "where": "r1c2",
+      "note": "readable lettering on the back wall"
+    }
+  ],
+  "size": {
+    "expected": {
+      "w": 4.571,
+      "d": 3.429,
+      "h": 2.571
+    },
+    "observed": {
+      "w": 4.6,
+      "d": 3.4,
+      "h": 2.5
+    },
+    "deviation": {
+      "w": 0.006,
+      "d": 0.008,
+      "h": -0.028
+    },
+    "within": true
+  },
+  "premium": true,
+  "reviewer_verdict": "fail",
+  "verdict": "fail",
+  "reviewer": "subagent",
+  "notes": "",
+  "inherited_from": null,
+  "reviewed_at": "2026-10-01T09:00:03+02:00"
+}
