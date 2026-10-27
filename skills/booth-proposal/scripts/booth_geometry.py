@@ -1,8 +1,8 @@
-"""Booth geometry: check that a concept fits its envelope, and draw it as a white scaled model for the appendix.
+"""Booth geometry: check that a concept fits its envelope; massing is an internal white model, never in the proposal.
 
 The geometry spec (JSON) is the single source of truth for a concept's dimensions. The geometry check, the plan
 drawing (draw_plan.py) and the massing images all read the same file. The spec is written after the renders, from
-the chosen View 1, and fixes that design at its real size; if the check fails, the design changes and is rendered
+the chosen hero view, and fixes that design at its real size; if the check fails, the design changes and is rendered
 again. The massing images are internal documentation only, never an image-model input and never in the proposal.
 
 Usage (every command also takes --project P; without it the project is "." when ./brief/ exists, else the command
@@ -80,7 +80,7 @@ Per element:
   "render_hint": "..."           what the element really looks like (as in the chosen render) when its spec shape is
                                  only an approximation ("one continuous layered mountain ridge, low at the left,
                                  highest near the right"); printed by `hints`. A note for reading plan, massing and
-                                 render together, not text for a View 1 prompt
+                                 render together, not text for a hero prompt
   "layer": 0                     manual paint order for the massing (lower paints first); only needed when two
                                  pieces intersect, e.g. a ribbon resting on a counter
 """
@@ -288,7 +288,7 @@ def hints(spec):
             print(" ".join(f'{e["id"]} {e.get("label", "")}:'.split()), e["render_hint"])
 
 
-# ---------- massing: a white scaled model for the appendix ----------
+# ---------- massing: a white scaled model, internal, never in the proposal ----------
 
 COLOURS = dict(bg="#F3F3F1", ground="#E9E9E6", plate="#F7F7F5", plate_edge="#9A9A96", wall="#FFFFFF",
                body="#FFFFFF", hero="#DCE3EE", person="#BDBDB8", edge="#8E8E8A")

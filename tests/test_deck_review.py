@@ -311,7 +311,7 @@ SCAN_BRIEF = Path(__file__).resolve().parent.parent / "output" / "run-051-v2" / 
 
 def test_review_md_deck_anchors():
     text = REVIEW_MD.read_text(encoding="utf-8")
-    deck_part = text[text.index("## Deck review"):]
+    deck_part = text[text.index("## Proposal review"):]
     assert [a for a in DECK_ANCHORS if a not in deck_part] == []
     if not SCAN_BRIEF.is_file():
         pytest.skip("no output/run-051-v2/brief/brief.json for the client-word scan")

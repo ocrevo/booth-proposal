@@ -1,8 +1,0 @@
-schema_version: "1.1"
-name: content-from-materials
-expected_outcome: |
-  A content inventory with verbatim items and sources (founding year, the 1981 first, 40+ countries, hand calibration,
-  the brand line), a message platform with three headline options and at most three key messages, content maps per
-  concept, and a sign-off list holding the superlative and the possibly outdated number. Nothing invented.
-context:
-  scaffold_script: place-files.sh
