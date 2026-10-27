@@ -1,0 +1,36 @@
+{
+  "lang": "en",
+  "budget_factor": 1.8,
+  "stamp": "Draft – concept visualization, not for construction",
+  "chrome": {
+    "recommended": "Recommended",
+    "to_supply": "To be supplied",
+    "to_confirm": "To be confirmed",
+    "appendix": "Appendix",
+    "cont": " (cont.)",
+    "concept": "Concept {}",
+    "main_aisle": "MAIN AISLE",
+    "aisle": "AISLE",
+    "sides": {"front": "front", "back": "back", "left": "left", "right": "right"},
+    "list_sep": ", ",
+    "highest_point": "Highest point",
+    "size": "Size",
+    "open_sides": "Open sides"
+  },
+  "ref_formats": {"page": "see p. {}", "pages": "see pp. {}", "sep": ", ", "num": "{:02d}"},
+  "todo_markers": ["TODO", "TBD", "TK", "XXX", "PASS", "FAIL"],
+  "source_headers": ["Source", "Basis", "Ref."],
+  "reference_phrases": ["reference image", "reference photo", "previous stand", "last year's stand", "existing stand", "former stand"],
+  "evolution_words": ["evolve", "evolution", "upgrade", "carry over", "carries forward", "builds on"],
+  "comparison_words": ["than before", "than ever", "as before", "familiar", "even more"],
+  "report": {
+    "brief": "Brief summary",
+    "ideas": "Idea board",
+    "renders": "Renders",
+    "concepts": "Developed concepts",
+    "pass": "pass",
+    "fail": "fail",
+    "none": "(none)",
+    "cost_line": "{concepts} concepts × {per} candidates = {images} images, about {minutes} min if run one after another"
+  }
+}

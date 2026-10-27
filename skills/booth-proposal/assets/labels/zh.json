@@ -1,0 +1,36 @@
+{
+  "lang": "zh",
+  "budget_factor": 1.0,
+  "stamp": "初稿 – 概念效果示意，不用于施工",
+  "chrome": {
+    "recommended": "推荐方案",
+    "to_supply": "待提供",
+    "to_confirm": "待客户确认",
+    "appendix": "附录",
+    "cont": "（续）",
+    "concept": "方案 {}",
+    "main_aisle": "主通道",
+    "aisle": "通道",
+    "sides": {"front": "正面", "back": "背面", "left": "左侧", "right": "右侧"},
+    "list_sep": "、",
+    "highest_point": "最高点",
+    "size": "尺寸",
+    "open_sides": "开口"
+  },
+  "ref_formats": {"page": "见第 {} 页", "pages": "见第 {} 页", "sep": "、", "num": "{:02d}"},
+  "todo_markers": ["TODO", "TBD", "PASS", "FAIL", "待补充", "待定", "待出图", "待修图"],
+  "source_headers": ["出处", "来源", "依据"],
+  "reference_phrases": ["参考图", "参考照片", "参考案例", "往届展台", "上一届展台", "以往展台"],
+  "evolution_words": ["延续", "升级", "演进", "沿用", "焕新", "传承"],
+  "comparison_words": ["更加", "比以往", "和以前一样", "熟悉的", "一如既往"],
+  "report": {
+    "brief": "简报要点",
+    "ideas": "想法板",
+    "renders": "出图结果",
+    "concepts": "深化结果",
+    "pass": "通过",
+    "fail": "不通过",
+    "none": "（无）",
+    "cost_line": "{concepts} 个方案 × 每个 {per} 张候选 = {images} 张，逐张出图约 {minutes} 分钟"
+  }
+}
