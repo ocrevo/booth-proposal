@@ -6,19 +6,19 @@ This tool belongs to a design company. Design leads what the client sees; constr
 
 Work in this order, inside the frame. Each step feeds the next; skipping to form produces decoration.
 
-1. **Insight.** What does this client need visitors to feel and remember, and what is true about them that no competitor can claim? Use the audience (who walks past and why), the occasion, the brand's character and its story. One sentence.
+1. **Insight.** What does this client need visitors to feel and remember, and what is true about them that no competitor can claim? Use the audience (who walks past and why), the occasion, the brand's character and its story. One sentence. It rests on something written: name its source (a line of the tender, the client's material), or word it as the studio's view ("We believe…" / "我们认为…"). A reference image is never its source, and a guess is never written as a fact.
 2. **Idea.** The insight turned into an image people can grasp in three seconds. One sentence, ideally with a name of two to four words.
 3. **Experience.** What happens at 10 m (a landmark that stops people), at 3 m (an invitation to step in) and inside (discovery, then conversation). Include the photo moment: the thing visitors will want to photograph.
 4. **Form.** The hero element that carries the idea, and how the rest of the space supports it. Space follows the idea; the layout comes from here, not from a template. Size the idea against the frame at once: a gesture that only works at a size the booth does not have is not an idea for this booth.
 5. **Atmosphere.** Light, material, colour and, where it helps, sound and scent, each chosen because it tells the idea, not because it is fashionable.
-6. **Graphics and content.** What the booth says, chosen and placed with references/content-strategy.md: one headline, a few proof points, the brand placed with precision, the most important content carried by the hero itself. Typography that belongs to the brand.
+6. **Graphics and content.** What the booth says, chosen and placed with references/content-strategy.md: one headline, a few proof points, the brand placed with precision, the most important content carried by the hero itself. Typography that belongs to the brand. Words, names, years, numbers and the logo are set by us, never painted by the image model: the prompt leaves those surfaces plain, the real logo is composited or applied by the designer, and the proposal carries the copy as text (references/image-prompts.md).
 7. **Craft.** Proportions, joints, edges, how surfaces meet the floor. The details that separate a studio's work from a contractor's. Name one **signature detail** per concept (a 3 cm shadow gap between bands, a counter floating on a reveal, brass pins on the peaks); it goes into the concept text and the content map's hero row; it reaches the View 1 prompt only as part of the hero's two or three sentences, when the idea depends on it.
 
 ## Diverge, then choose
 
-Do not develop the first three ideas you think of. Sketch five or six, one line each, each with a rough size against the frame; use the territories below to vary them. Then choose three that clearly differ from each other, using the critique questions for Insight, Idea and Specificity and a rough fit. Keep a line on each rejected idea for the appendix; clients and designers like to see the road not taken.
+Do not develop the first three ideas you think of. Sketch five or six, one line each, each with a rough size against the frame; use the territories below to vary them. Then choose three that clearly differ from each other, using the critique questions for Insight, Idea and Specificity and a rough fit. Keep a line on each rejected idea in brief/ideas.md (idea, rough size, result, reason). It is a working note for the studio and never goes into the proposal.
 
-When the client's own previous booth is among the references, at least two of the three grow out of its signature structure (its portal, its arch, its wall), each pushed in a different direction and made clearly more premium; the third may break away. A concept that drops what the client recognises needs a strong reason, written down.
+References are inputs. A concept may evolve what the client loves in a reference (its signature structure, colours, glow, level of finish), pushed in its own direction and made clearly more premium. Keep the set varied: at least one of the three starts from somewhere else, such as the brand story, the content or a territory below. However a concept began, it is described on its own merit: the proposal never mentions the reference, the old stand or the road from it.
 
 As soon as the three are chosen, make their View 1 images (references/image-prompts.md); develop them afterwards.
 
@@ -35,7 +35,7 @@ The territories are a source of variety, not a rule: the three concepts need not
 | Media and interaction | Moving image or responsive surfaces used as architecture | The space reacts to you |
 | Nature and the organic | Living or organic forms, grown rather than built | Calm, alive, human |
 
-The three concepts should also look different: if two share the same hero form, main material and light, change one. Concepts that grow from the same reference structure differ in where they take it.
+The three concepts should also look different: if two share the same hero form, main material and light, change one. Two concepts that evolve the same reference structure differ in where they take it.
 
 ### Supporting systems
 
@@ -69,7 +69,7 @@ The three concepts are not all restrained unless the client's register (style ca
 - **Coherence.** Every material, light and graphic choice can be explained by the idea.
 - **Restraint serves the idea; it is not a style.** A disciplined palette and few materials usually help. But a concept that calls for richness, colour or immersion should commit to it fully. Minimalism by default is its own cliché.
 - **Light is a material.** Design light as atmosphere: washes, glows, grazing light, darkness. Glowing surfaces, light inside a form, a brand colour lit from within – all can be the idea. Light that only outlines edges is decoration.
-- **Materials with meaning.** Choose materials because they say something about the client (glass for a vaccine maker's precision, for instance), not from a fashionable list.
+- **Materials with meaning.** Choose materials because they say something about the client (brushed aluminium for a precision-instrument maker, for instance), not from a fashionable list.
 - **Brand through form.** Express brand values through shape, light and material; place the logo once with confidence rather than everywhere.
 - **Heritage without nostalgia.** Tell history through sequence, material and scale, never through clip art, sepia collages or ornamental frames.
 
@@ -86,7 +86,7 @@ The new, "tasteful" clichés:
 - Generic "premium" materials chosen without a reason
 - Abstract shapes or lines of light that could belong to any brand
 
-Use this list when shaping ideas, not to strip the renders: what the client loves in their references (brightness, glow, brand blue, scale) stays unless the idea needs otherwise. Never write it into an image prompt as an avoid list.
+Use this list when shaping ideas, not to strip the renders: what the client loves in their references (brightness, glow, brand colour, scale) stays unless the idea needs otherwise. Never write it into an image prompt as an avoid list.
 
 ## Creative director critique
 
@@ -94,7 +94,7 @@ After developing the three chosen concepts (geometry checked, text written to ma
 
 | Criterion | Question |
 | --- | --- |
-| Insight | Is it built on something true and specific about this client and audience? |
+| Insight | Is it built on something true and specific about this client and audience, with its source in the tender or the client's material, or worded as our view? |
 | Idea | Can a visitor get it in three seconds, and would they remember it tomorrow? |
 | Specificity | Does it pass the no-swap test? |
 | Emotion | Does it make people feel something, not just inform them? |
@@ -106,8 +106,13 @@ After developing the three chosen concepts (geometry checked, text written to ma
 
 A concept that scores below 4 on Insight, Idea or Specificity is rebuilt from a new insight, not patched. Other criteria below 4 are revised. A rebuilt or reshaped concept is rendered again. Show the user the critique in one line per concept; the scores only if asked.
 
+The critique is internal. Write it in concept.md in three parts:
+- the critique itself: weaknesses, risks, scores; it never reaches the proposal;
+- `为什么值得选 / Why choose it`: one or two lines on the concept's strengths, for the client;
+- `深化方向 / Next step`: one line on how the design will be developed, for the comparison page. An open risk becomes a next step, worded as work we will do, never as a flaw.
+
 Two checks across the set:
 - **Supporting systems differ**: no two concepts share floor, seating and light temperature.
 - **No empty words**: concept text that leans on 科技感, 高端大气, 打造, "premium feel", "cutting-edge", or "immersive" without saying how, fails Specificity until it names the material, light or form that does the work.
 
-Every render gets its own short critique. Ask first: does it look premium, polished and finished, at least as good as the client's references? Is the idea readable at a glance? Is the size right, with the people as the scale?
+Every render gets its own short critique. Ask first: does it look premium, polished and finished, at least as good as the client's references? Is the idea readable at a glance? Is the size right, with the people as the scale? Then: does it show any text, name, year, number, emblem or logo the model drew? Such a render is fixed, regenerated or blocked (`blocked: renders/<file> – reason` in concept.md), never placed.

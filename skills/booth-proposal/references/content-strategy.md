@@ -24,7 +24,7 @@ Types:
 - **action** – what visitors are asked to do (scan, play, take, meet)
 - **mandatory** – logos, legal lines, regulatory statements the client requires
 
-Flags: `number`, `superlative` (first, only, largest, leading), `comparative`, `regulated` (health, medical, financial, environmental claims), `dated` (a figure that may be out of date), `verify spelling`, `needs translation`.
+Flags: `number`, `superlative` (first, only, largest, leading), `comparative`, `regulated` (health, medical, financial, environmental claims), `dated` (a figure that may be out of date), `verify` (sources disagree, or the fact needs the client's confirmation), `verify spelling`, `needs translation`.
 
 Never add facts that are not in the files. If the brief needs content the client has not supplied (for example product claims for a product that is only named), list it under "Content to request from the client".
 
@@ -44,7 +44,9 @@ Score each item from 1 to 3 on five questions:
 
 The most representative content scores high on Distinctive and Proof together. "Committed to quality" scores low on both; a first, an only, a dated origin, a specific share of a market score high. Ties go to what serves the concept's idea.
 
-Items flagged `superlative`, `comparative`, `regulated` or `dated` can be used, but they go on a list of **claims for client sign-off**: exact wording, source, and a note that the client must confirm the claim is current and approved for public display.
+Items flagged `superlative`, `comparative`, `regulated`, `dated` or `verify`, and numbers that can change (shares, counts, people reached), can be used, but they go on a list of **claims for client sign-off**: exact wording, source, and a note that the client must confirm the claim is current and approved for public display.
+
+In the proposal, every use of a sign-off claim carries the small tag "需客户确认" / "to be confirmed", on every page where it appears. The proposal's appendix lists only the claims actually used on its pages, in plain wording, with their page numbers (references/proposal-deck.md). Use one wording per claim throughout: if two items say the same thing differently, choose one and keep it everywhere.
 
 ## 3. Hierarchy: write for viewing distance
 
@@ -63,7 +65,7 @@ Rules of thumb:
 - A common signage rule of thumb is about 25 mm of letter height per 3 m of comfortable reading distance (1 inch per 10 ft). A headline meant to stop people at 10 m needs far more. The designer sets final sizes.
 - For an international audience, decide one primary language per level; the secondary language sits smaller beneath it, never at equal size everywhere.
 
-Write the copy by shortening the client's own words. Keep the meaning, keep numbers exactly, and keep regulated claims verbatim. Mark every line you shortened as "edited from C<n>" so it can be traced.
+Write the copy by shortening the client's own words. Keep the meaning, keep numbers exactly, and keep regulated claims verbatim. Mark every line you shortened as "edited from C<n>" so it can be traced. These markers and the C-IDs stay in the cards and concept.md; the proposal shows only the plain copy (a sign-off claim's ID travels as a `data-claim` attribute, never as text).
 
 ## 4. Place: let the design carry the content
 
@@ -76,7 +78,7 @@ Content belongs in the architecture, not on posters added to it. Before assignin
 
 Keep at least half of the booth's visible surfaces free of text. If the content does not fit, cut content, not space.
 
-The content map is not written into image prompts: a render shows the client's name and little else, and any other text in it is checked and removed if garbled or invented (references/image-prompts.md). The content map says where the copy goes; the designer applies it.
+The content map is not written into image prompts: a render shows no text, names, years, numbers or logo, only plain surfaces where they will go. Anything the model paints anyway is removed or the render is blocked (references/image-prompts.md). The content map says where the copy goes; the designer applies it. When the proposal describes a surface's content that the image leaves plain, it calls it design intent ("设计意图").
 
 ## 5. Output
 
@@ -98,4 +100,4 @@ Content to request from the client
 | Hero: <element> | L1 | … | C3, C7 | carved / printed / light |
 ```
 
-In the concept presentation, show only "What the booth says": the headline and the three key messages in one or two lines. The full inventory, the content map and the sign-off list go to the appendix.
+In the proposal, show only "What the booth says": the message platform's headline and key messages on their own page, and per concept the headline and the three key messages in one or two lines. The full inventory, the content maps and the full sign-off list are internal cards; they never go into the proposal. Its appendix lists only the sign-off claims used on its pages.

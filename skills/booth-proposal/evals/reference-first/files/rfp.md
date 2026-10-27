@@ -45,4 +45,4 @@ Halvard Instruments builds precision instruments for life-science laboratories: 
 
 ## 6. Our previous stand
 
-previous-stand.png shows our stand at LabWorld Europe 2025. Visitors and our sales team know it by its deep green rounded portal arch. We would like the new stand to build on what people recognise, but it should feel clearly more premium.
+previous-stand.png shows our stand at LabWorld Europe 2025. Visitors and our sales team know it by its deep green arch. We would like the new stand to build on what people recognise, but it should feel clearly more premium.

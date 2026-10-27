@@ -1,11 +1,13 @@
 schema_version: "1.1"
 name: concepts-from-rfp
 expected_outcome: |
-  Design first: an insight, then three clearly different concepts, each with manifesto, idea, experience, what it
-  says, atmosphere, plan, renders (or their prompts) and a creative director note. Order of work: right after the
-  three ideas are chosen, short View 1 prompts (with any reference images attached, never a massing image), two
-  candidates per concept, one chosen and checked by eye, View 2 edited from it; then per concept a geometry spec whose
-  check passes, a plan and concept text that matches the chosen image. An appendix with frame card (area and depth
-  budgets), assumptions, compliance per concept and rejected ideas.
+  Design first: an insight (citing the RFP or client material, or worded as the studio's view), then three clearly
+  different concepts, each with manifesto, idea, experience, what it says, atmosphere, plan, renders (or their
+  prompts) and why it is worth choosing. Order of work: right after the three ideas are chosen, short View 1 prompts
+  (with any reference images attached, never a massing image, no text or logo asked of the model), two candidates per
+  concept, one chosen and checked by eye, View 2 edited from it; then per concept a geometry spec whose check passes,
+  a plan and concept text that matches the chosen image. Working notes for the studio (frame card with area and depth
+  budgets, assumptions, compliance per concept, rejected ideas) live in brief/ and concepts/ and stay out of the
+  client proposal.
 context:
   scaffold_script: place-files.sh

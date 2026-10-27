@@ -1,6 +1,6 @@
 # Requirement card – template and rules
 
-The requirement card is the single source of truth for what the client asked for. It works quietly in the background: precise here, brief in front of the user. It also holds the design brief, the human side of the RFP that the concepts are built on.
+The requirement card is the single source of truth for what the client asked for. It works quietly in the background: precise here, brief in front of the user. It also holds the design brief, the human side of the RFP that the concepts are built on. It is an internal card: the proposal takes only the event facts from it (event, venue, dates, size, open sides, height limit) and never shows its IDs, sources, assumptions or deliverables.
 
 It lives in `brief/requirement-card.md` and is reused across runs: a new run copies it instead of reading everything again, and updates it only when files or facts change (raising the version).
 
@@ -9,9 +9,11 @@ It lives in `brief/requirement-card.md` and is reused across runs: a new run cop
 - One requirement per row. If a sentence in the RFP asks for two things, make two rows.
 - Copy numbers exactly as written (sizes, quantities, dates, heights). Do not round or convert in the requirement text; put conversions in brackets.
 - Source = file name plus page, slide or section, e.g. `tender.pptx s.4` or `RFP.pdf p.7 §3.2`. Count slides and pages in file order, not by the numbers printed in the document's footer, which often differ (a cover slide is usually unnumbered); say once at the top which convention you use.
-- When two parts of the RFP disagree (for example the event dates on one page and the show dates on another), record both with their sources and add an assumption that states which one you used and why. Never pick one silently.
-- Hard requirement = the RFP states it must be done or provided (size, height limit, "at least one large screen", dates, deliverables). Soft requirement = theme, style, tone, preferences ("reflect our centenary", "use brand colours").
-- If the RFP is ambiguous or silent, write the row anyway and add an assumption (A1, A2…) with your best guess. Do not stop to ask.
+- When two parts of the RFP disagree (for example the event dates on one page and the show dates on another), record both with their sources and add an assumption that states which one you used and why. Never pick one silently. When the event has conference days and exhibition days, record both: the proposal's project page shows them apart.
+- Hard requirement = the RFP states it must be done or provided (size, height limit, "at least one large screen", dates, deliverables). Soft requirement = theme, style, tone, preferences ("celebrate our 75 years", "use brand colours").
+- If the RFP is ambiguous or silent, write the row anyway and add an assumption (A1, A2…) with your best guess. Do not stop to ask. Where the proposal uses an assumed fact (open sides, for example), it reads as a design setting: "暂按前、右两面开口" / "assumed for now: open front and right".
+- IDs never clash between cards: R hard requirements, P soft requirements, A assumptions, DL deliverables (here), C content items (brief/content.md), D design points (brief/design-points.md).
+- Every requirement that asks something of the design (theme, brand, content, products, screens, interaction, hospitality, giveaways, graphics, space) also becomes a row in brief/design-points.md, written in plain client language (references/proposal-deck.md, Inputs). The proposal answers those rows.
 - Write in the user's language. Keep short original-language quotes in quotation marks where wording matters.
 
 ## Template
@@ -27,11 +29,12 @@ Project
 
 Dates
 - Build-up: <…>   Show: <…>   Dismantle: <…>      Source: <…>
+- Conference: <…>   Exhibition: <…>   (only when the event has both)   Source: <…>
 
 Booth
 - Size: <W × D> (<area>)            Source: <…>
 - Booth type: inline | corner | peninsula | island | unknown
-- Open sides: <…>                    Source: <…>
+- Open sides: <…>                    Source: <… | assumption A<n>>
 - Max height: <…>                    Source: <…>
 - Location in hall: <…>              Source: <…>
 
@@ -51,11 +54,12 @@ Soft requirements (theme, style, tone)
 
 Deliverables requested by the RFP
 | ID | Deliverable | Covered by this skill? |
-| D1 | Booth design concept | Yes |
-| D2 | Itemised price | No – handled separately |
+| DL1 | Booth design concept | Yes – the proposal |
+| DL2 | Graphic designs | Yes, as boards in pack/boards/ – or handled separately ("另行提交" in the response table) |
+| DL3 | Itemised price | No – handled separately; never in the proposal |
 
 Brand elements
-- Logo files provided: yes/no (<file, slide>)
+- Logo files provided: yes/no (<file, slide>). The deck uses the official file, copied to brief/brand/ and named in brief/deck-style.json; if only a crop from a slide exists, request the file
 - Brand colours: <names / values if given>
 - Slogans or mandatory messages: <…>
 - Imagery rules: <e.g. "do not use original product photos">
