@@ -329,3 +329,25 @@ def test_logo_hashes_and_find_font(project):
     for cjk in (False, True):
         font = common.find_font(cjk)
         assert font is None or font.lower().endswith((".ttf", ".ttc", ".otf"))
+
+
+def test_geometry_helpers():
+    spec = {"width": 8, "depth": 6, "max_height": 4.5, "elements": [
+        {"label": "Fins", "x": 1, "y": 1, "w": 0.2, "h": 1, "height": 1,
+         "repeat": {"count": 5, "dx": 0.3, "height_to": 2}},
+        {"label": "Tasting bar", "x": 0, "y": 4, "w": 2, "h": 1, "height": 1},
+        {"label": "Tasting bar", "x": 3, "y": 4, "w": 2, "h": 1, "height": 1},
+        {"x": 6, "y": 4, "w": 1, "h": 1}]}
+    out = common.normalise_geometry(spec)
+    assert out is spec
+    fins, bar, _, bare = spec["elements"]
+    assert [e["id"] for e in spec["elements"]] == ["E1", "E2", "E3", "E4"]
+    assert bar["z"] == 0 and bar["shape"] == "box"
+    assert abs(fins["w"] - 1.4) < 1e-9 and fins["height"] == 2 and fins["piece"] == {"w": 0.2, "h": 1}
+    assert common.normalise_geometry(spec)["elements"][0]["w"] == fins["w"]   # idempotent
+    pieces = common.expand_repeat(fins)
+    assert len(pieces) == 5 and all(p["w"] == 0.2 and "repeat" not in p for p in pieces)
+    assert abs(pieces[4]["x"] - 2.2) < 1e-9 and pieces[0]["height"] == 1 and pieces[4]["height"] == 2
+    assert common.expand_repeat(bar) == [bar]
+    assert common.zone_numbers(spec["elements"]) == {"Fins": 1, "Tasting bar": 2}
+    assert common.zone_numbers([]) == {}

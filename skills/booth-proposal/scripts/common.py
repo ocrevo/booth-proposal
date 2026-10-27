@@ -789,3 +789,255 @@ def find_font(cjk: bool) -> str | None:
             if os.path.isfile(path):
                 return path
     return None
+
+
+# ---------- geometry helpers (contract 6.3, phase 2 card steps 3-4) ----------
+
+def normalise_geometry(spec: dict) -> dict:
+    """Fill defaults in place and return the spec: elements (or zones), id, z, shape; a repeat row becomes its
+    bounding box, the single piece is kept under "piece" for drawing."""
+    spec.setdefault("elements", spec.get("zones", []))
+    for i, e in enumerate(spec["elements"], 1):
+        e.setdefault("id", f"E{i}")
+        e.setdefault("z", 0)
+        e.setdefault("shape", "frame" if e.get("kind") == "overhead" and e.get("legs") else "box")
+        r = e.get("repeat")
+        if r and "piece" not in e:   # the checked footprint of a row is its bounding box
+            r["_from"] = e.get("height", 0)
+            e["piece"] = {"w": e["w"], "h": e["h"]}
+            e["w"] = (r["count"] - 1) * abs(r.get("dx", 0)) + e["w"]
+            e["h"] = (r["count"] - 1) * abs(r.get("dy", 0)) + e["h"]
+            e["height"] = max(e.get("height", 0), r.get("height_to", e.get("height", 0)))
+    return spec
+
+
+def expand_repeat(element: dict) -> list[dict]:
+    """Expand a normalised repeated element into its individual pieces (for drawing)."""
+    r = element.get("repeat")
+    if not r:
+        return [element]
+    out, n = [], r["count"]
+    for i in range(n):
+        p = dict(element)
+        p.pop("repeat", None)
+        p.update(x=element["x"] + i * r.get("dx", 0), y=element["y"] + i * r.get("dy", 0),
+                 w=element["piece"]["w"], h=element["piece"]["h"])
+        if "height_to" in r:
+            p["height"] = r["_from"] + (r["height_to"] - r["_from"]) * (i / (n - 1) if n > 1 else 0)
+        out.append(p)
+    return out
+
+
+def zone_numbers(elements: list[dict]) -> dict[str, int]:
+    """{label: number}: distinct non-empty labels in list order; a repeat row is one element."""
+    out: dict[str, int] = {}
+    for z in elements:
+        lab = z.get("label") or ""
+        if lab and lab not in out:
+            out[lab] = len(out) + 1
+    return out
+
+
+_GEO_SIDES = ("front", "back", "left", "right")
+_GEO_SHAPES = ("box", "cylinder", "circle", "frame", "extrusion")
+_GEO_SUPPORTS = ("floor", "wall", "legs", "columns", "hung")
+_GEO_ACCENT_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_MISSING = object()
+
+
+def _is_num(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf")
+
+
+def _got(v) -> str:
+    return "nothing (missing)" if v is _MISSING else json.dumps(v, ensure_ascii=False, default=str)
+
+
+def validate_geometry(spec: dict) -> list[Finding]:
+    """Validate a raw geometry spec (phase 2 card, step 4). One C-INPUT finding per problem, where = JSON path.
+    Unknown keys are ignored."""
+    out: list[Finding] = []
+
+    def bad(path: str, rule: str, value=_MISSING) -> None:
+        out.append(Finding("C-INPUT", "error", path, f"{path} must be {rule}, got {_got(value)}"))
+
+    def num(obj: dict, key: str, path: str, *, required=False, lo=None, strict=True) -> None:
+        """Number check; lo is a lower bound (strict: value > lo, else value >= lo)."""
+        v = obj.get(key, _MISSING)
+        rule = "a number" if lo is None else f"a number {'>' if strict else '>='} {lo}"
+        if v is _MISSING:
+            if required:
+                bad(path, rule)
+            return
+        if not _is_num(v) or (lo is not None and (v <= lo if strict else v < lo)):
+            bad(path, rule, v)
+
+    def string(obj: dict, key: str, path: str) -> None:
+        v = obj.get(key, _MISSING)
+        if v is not _MISSING and not isinstance(v, str):
+            bad(path, "a string", v)
+
+    def one_of(obj: dict, key: str, path: str, options) -> None:
+        v = obj.get(key, _MISSING)
+        if v is not _MISSING and not (isinstance(v, str) and v in options):
+            bad(path, "one of " + ", ".join(f'"{o}"' for o in options), v)
+
+    def boolean(obj: dict, key: str, path: str) -> None:
+        v = obj.get(key, _MISSING)
+        if v is not _MISSING and not isinstance(v, bool):
+            bad(path, "true or false", v)
+
+    def triple(obj: dict, key: str, path: str) -> None:
+        v = obj.get(key, _MISSING)
+        if not isinstance(v, list) or len(v) != 3:
+            bad(path, "a list of 3 numbers", v)
+            return
+        for k, item in enumerate(v):
+            if not _is_num(item):
+                bad(f"{path}[{k}]", "a number", item)
+
+    if not isinstance(spec, dict):
+        bad("(root)", "an object", spec)
+        return out
+
+    one_of(spec, "unit", "unit", ("m", "ft"))
+    for key in ("width", "depth", "max_height"):
+        num(spec, key, key, required=True, lo=0)
+
+    sides = spec.get("open_sides", _MISSING)
+    if sides is not _MISSING:
+        if not isinstance(sides, list):
+            bad("open_sides", "a list of front, back, left, right", sides)
+        else:
+            seen = set()
+            for i, s in enumerate(sides):
+                if not (isinstance(s, str) and s in _GEO_SIDES):
+                    bad(f"open_sides[{i}]", "one of " + ", ".join(f'"{x}"' for x in _GEO_SIDES), s)
+                elif s in seen:
+                    bad(f"open_sides[{i}]", "a side listed once", s)
+                else:
+                    seen.add(s)
+
+    key = "elements" if "elements" in spec else ("zones" if "zones" in spec else "elements")
+    elements = spec.get(key, _MISSING)
+    if not isinstance(elements, list) or not elements:
+        bad(key, "a non-empty list of objects", elements)
+    else:
+        for i, e in enumerate(elements):
+            p = f"{key}[{i}]"
+            if not isinstance(e, dict):
+                bad(p, "an object", e)
+                continue
+            num(e, "x", f"{p}.x", required=True)
+            num(e, "y", f"{p}.y", required=True)
+            num(e, "w", f"{p}.w", required=True, lo=0)
+            num(e, "h", f"{p}.h", required=True, lo=0)
+            num(e, "z", f"{p}.z", lo=0, strict=False)
+            num(e, "height", f"{p}.height", lo=0, strict=False)
+            for f in ("id", "label", "kind", "group", "render_hint"):
+                string(e, f, f"{p}.{f}")
+            one_of(e, "shape", f"{p}.shape", _GEO_SHAPES)
+            num(e, "band", f"{p}.band", lo=0)
+            if e.get("shape") == "extrusion":
+                prof = e.get("profile", _MISSING)
+                if not isinstance(prof, list) or len(prof) < 2:
+                    bad(f"{p}.profile", "a list of at least 2 [number, number] points", prof)
+                else:
+                    for k, pt in enumerate(prof):
+                        if not (isinstance(pt, list) and len(pt) == 2 and all(_is_num(c) for c in pt)):
+                            bad(f"{p}.profile[{k}]", "a [number, number] point", pt)
+            one_of(e, "axis", f"{p}.axis", ("x", "y"))
+            r = e.get("repeat", _MISSING)
+            if r is not _MISSING:
+                if not isinstance(r, dict):
+                    bad(f"{p}.repeat", "an object", r)
+                else:
+                    c = r.get("count", _MISSING)
+                    if not (isinstance(c, int) and not isinstance(c, bool) and c >= 1):
+                        bad(f"{p}.repeat.count", "an integer >= 1", c)
+                    num(r, "dx", f"{p}.repeat.dx")
+                    num(r, "dy", f"{p}.repeat.dy")
+                    num(r, "height_to", f"{p}.repeat.height_to", lo=0, strict=False)
+            prog = e.get("program", _MISSING)
+            if prog is not _MISSING:
+                if isinstance(prog, list):
+                    for k, item in enumerate(prog):
+                        if not isinstance(item, str):
+                            bad(f"{p}.program[{k}]", "a string", item)
+                elif not isinstance(prog, str):
+                    bad(f"{p}.program", "a string or a list of strings", prog)
+            one_of(e, "support", f"{p}.support", _GEO_SUPPORTS)
+            boolean(e, "contains", f"{p}.contains")
+            boolean(e, "legs", f"{p}.legs")
+            one_of(e, "label_pos", f"{p}.label_pos", ("top",))
+            num(e, "layer", f"{p}.layer")
+
+    string(spec, "title", "title")
+    acc = spec.get("accent", _MISSING)
+    if acc is not _MISSING and not (isinstance(acc, str) and _GEO_ACCENT_RE.match(acc)):
+        bad("accent", "a colour like #1F5FAE", acc)
+    one_of(spec, "camera_corner", "camera_corner", ("left", "right"))
+    cam = spec.get("camera", _MISSING)
+    if cam is not _MISSING:
+        if not isinstance(cam, dict):
+            bad("camera", "an object", cam)
+        else:
+            for name, c in cam.items():
+                p = f"camera.{name}"
+                if not isinstance(c, dict):
+                    bad(p, "an object with eye and target", c)
+                    continue
+                triple(c, "eye", f"{p}.eye")
+                triple(c, "target", f"{p}.target")
+                num(c, "lens_mm", f"{p}.lens_mm", lo=0)
+    num(spec, "wall_height", "wall_height", lo=0, strict=False)
+    num(spec, "walkway", "walkway", lo=0)
+    num(spec, "headroom", "headroom", lo=0)
+
+    zones = spec.get("height_zones", _MISSING)
+    if zones is not _MISSING:
+        if not isinstance(zones, list):
+            bad("height_zones", "a list of objects", zones)
+        else:
+            for i, z in enumerate(zones):
+                p = f"height_zones[{i}]"
+                if not isinstance(z, dict):
+                    bad(p, "an object", z)
+                    continue
+                num(z, "y_from", f"{p}.y_from", required=True)
+                lo = z.get("y_from")
+                num(z, "y_to", f"{p}.y_to", required=True, lo=lo if _is_num(lo) else None)
+                num(z, "max", f"{p}.max", required=True, lo=0)
+                string(z, "note", f"{p}.note")
+
+    rig = spec.get("rigging_allowed", _MISSING)
+    if rig is not _MISSING and rig is not None and not isinstance(rig, bool):
+        bad("rigging_allowed", "true, false or null", rig)
+
+    req = spec.get("required", _MISSING)
+    if req is not _MISSING:
+        if not isinstance(req, list):
+            bad("required", "a list of non-empty strings", req)
+        else:
+            for i, item in enumerate(req):
+                if not (isinstance(item, str) and item.strip()):
+                    bad(f"required[{i}]", "a non-empty string", item)
+
+    ov = spec.get("envelope_override", _MISSING)
+    if ov is not _MISSING:
+        if not isinstance(ov, list):
+            bad("envelope_override", "a list of objects", ov)
+        else:
+            for i, o in enumerate(ov):
+                p = f"envelope_override[{i}]"
+                if not isinstance(o, dict):
+                    bad(p, "an object", o)
+                    continue
+                f = o.get("field", _MISSING)
+                if not (isinstance(f, str) and f in ("max_height", "width", "depth")):
+                    bad(f"{p}.field", 'one of "max_height", "width", "depth"', f)
+                num(o, "value", f"{p}.value", required=True, lo=0)
+                rs = o.get("reason", _MISSING)
+                if not isinstance(rs, str):      # blank is allowed here; gates.py concepts rule envelope rejects it
+                    bad(f"{p}.reason", "a string", rs)
+    return out

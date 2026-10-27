@@ -3,22 +3,36 @@
 The geometry spec (JSON) is the single source of truth for a concept's dimensions. The geometry check, the plan
 drawing (draw_plan.py) and the massing images all read the same file. The spec is written after the renders, from
 the chosen View 1, and fixes that design at its real size; if the check fails, the design changes and is rendered
-again. The massing images are appendix documentation only, never an image-model input.
+again. The massing images are internal documentation only, never an image-model input and never in the proposal.
 
-Usage:
-  python booth_geometry.py check   spec.json      -> errors, warnings and "RESULT: PASS" or "RESULT: FAIL" (exit 1)
-  python booth_geometry.py massing spec.json out [--views hero,front] [--size 1536x1024]
-                                   -> out-hero.png (three-quarter view from the open corner), out-front.png
-  python booth_geometry.py hints   spec.json      -> prints every element's render_hint (what its pieces stand for)
+Usage (every command also takes --project P; without it the project is "." when ./brief/ exists, else the command
+runs standalone with the default thresholds and writes no sidecar):
+  python booth_geometry.py check   SPEC [--json]   -> findings (GEO-*) and "RESULT: PASS" or "RESULT: FAIL" (exit 1)
+  python booth_geometry.py massing SPEC OUTBASE [--views hero,front] [--size 1536x1024]
+                                   -> OUTBASE-hero.png (three-quarter view from the open corner), OUTBASE-front.png,
+                                      and, inside a project concept folder, OUTBASE-<view>.json (mode "massing")
+  python booth_geometry.py hints   SPEC            -> prints every element's render_hint (what its pieces stand for)
+  python booth_geometry.py facts   SPEC            -> JSON: unit, width, depth, max_height, highest_point, open_sides,
+                                      area, floor_cover, zones (n, label, kind, program, top), program_served,
+                                      required_missing
+Exit codes: 0 done, 1 at least one error finding, 2 unusable input (C-INPUT: unreadable JSON, a field of the wrong
+type with its JSON path, a unit other than m or ft, a bad option).
 
-Massing views: a white scaled model seen through a pinhole camera at eye level 1.6 m, 35 mm, with a 1.75 m person
-for scale, fitted so the stand fills the frame. A spec may fix a camera:
+Findings: GEO-FIT (error: footprint, height, headroom, profile, zone-height, overlap, rigging), GEO-PROGRAM (error:
+program) and GEO-ADVICE (warning: walkway, underside, support, rigging-unconfirmed, span, noheight). The message
+starts with the rule name; "where" is the element id.
+
+Units: "unit" is "m" (default) or "ft". Thresholds come from common.DEFAULTS (metres, scaled by the unit) and may be
+overridden per project in brief/deck-style.json "thresholds"; a spec's own "walkway" and "headroom" win for that spec.
+
+Massing views: a white scaled model seen through a pinhole camera at eye level, 35 mm, with a person for scale
+(common.DEFAULTS person_height_m), fitted so the stand fills the frame. A spec may fix a camera:
 "camera": {"hero": {"eye": [x, y, z], "target": [x, y, z], "lens_mm": 35}}. "wall_height" draws the closed sides
 as walls of that height.
 
 Spec:
 {
-  "title": "A · Rings of Time", "width": 6, "depth": 3, "max_height": 6, "unit": "m",
+  "title": "Harbour Gate", "width": 6, "depth": 3, "max_height": 6, "unit": "m",
   "open_sides": ["front", "right"],            # front = main aisle
   "camera_corner": "right",                    # hero view from the front-right (or "left") corner
   "elements": [
@@ -36,19 +50,23 @@ shape: box (default) | cylinder (w is the diameter; h is ignored) | frame (a por
        "band" thick, spanning w) | extrusion (a curved or stepped surface: "profile" is a list of [d, z] points
        along "axis" ("x", the default: d from the element's x across its width, swept over its depth h;
        or "y": d from the element's y across its depth, swept over its width w); use it for shells, canopies,
-       vaults, ribbons, steps).
+       vaults, ribbons, steps. The highest profile point counts as the element's top).
 kind: hero | zone | furniture | overhead (any other word, such as brand, is a plain element).
 "contains": true lets an element enclose others in plan
 (for example a canopy over a lounge) without counting as an overlap.
 
 Constraints the check enforces (all optional except width, depth, max_height):
-  "unit": "m" or "ft"            thresholds below scale with the unit (0.9 m = 3 ft walkway, 2.1 m = 7 ft headroom)
+  "unit": "m" or "ft"            thresholds (common.DEFAULTS, metres) scale with the unit
   "walkway", "headroom"          override the default minimums with the venue's own rules
   "height_zones": [{"y_from": 0, "y_to": 1.5, "max": 1.22, "note": "line of sight"}]
                                  extra height limits by depth band (y from the back wall), e.g. line-of-sight rules
   "rigging_allowed": true/false  from the venue card; null or missing = not confirmed
   "required": ["screen", "counter", "storage", ...]
                                  program items from the brief; each must be served by an element's "program"
+  "envelope_override": [{"field": "max_height", "value": 5.0, "reason": "..."}]
+                                 declares that width, depth or max_height deliberately differs from the booth in
+                                 brief.json (value in the spec's unit, a reason that says why); read by gates.py concepts, which
+                                 accepts an override only with a non-blank reason
 Per element:
   "repeat": {"count": 75, "dx": 0.056, "dy": 0, "height_to": 4.2}
                                  a row of identical pieces (fins, steps, columns): count pieces, each moved by dx/dy;
@@ -66,61 +84,39 @@ Per element:
   "layer": 0                     manual paint order for the massing (lower paints first); only needed when two
                                  pieces intersect, e.g. a ribbon resting on a counter
 """
+from __future__ import annotations
+
 import argparse
 import itertools
 import json
 import math
+import os
 import sys
 
-WALKWAY_M = 0.9    # minimum comfortable passage between floor elements, in metres; check local rules
-HEADROOM_M = 2.1   # minimum clear height under elements people walk under, in metres
-SPAN_M = 1.5       # free span from a single support beyond which structure needs review, in metres
-TOL = 0.005
+import common
+from common import Finding, InputError
 
 
-def unit_factor(spec):
-    return 3.28084 if spec.get("unit", "m") == "ft" else 1.0
+def load_spec(path: str) -> tuple[dict | None, list[Finding]]:
+    """Read and validate a geometry spec. InputError C-INPUT propagates for unreadable JSON; schema problems come
+    back as findings (spec None); otherwise the normalised spec."""
+    raw = common.read_json(path)
+    found = common.validate_geometry(raw)
+    if found:
+        return None, found
+    return common.normalise_geometry(raw), []
 
 
-def normalise(spec):
-    spec.setdefault("elements", spec.get("zones", []))
-    for i, e in enumerate(spec["elements"], 1):
-        e.setdefault("id", f"E{i}")
-        e.setdefault("z", 0)
-        e.setdefault("shape", "frame" if e.get("kind") == "overhead" and e.get("legs") else "box")
-        r = e.get("repeat")
-        if r and "piece" not in e:   # the checked footprint of a row is its bounding box; the single piece is kept for drawing
-            r["_from"] = e.get("height", 0)
-            e["piece"] = {"w": e["w"], "h": e["h"]}
-            e["w"] = (r["count"] - 1) * abs(r.get("dx", 0)) + e["w"]
-            e["h"] = (r["count"] - 1) * abs(r.get("dy", 0)) + e["h"]
-            e["height"] = max(e.get("height", 0), r.get("height_to", e.get("height", 0)))
-    return spec
+def element_top(e: dict) -> float:
+    """z + height; for an extrusion with a profile also the highest profile point (the larger wins)."""
+    top = e.get("z", 0) + e.get("height", 0)
+    if e.get("shape") == "extrusion" and e.get("profile"):
+        top = max(top, max(p[1] for p in e["profile"]))
+    return top
 
 
-def load(path):
-    with open(path, encoding="utf-8") as f:
-        return normalise(json.load(f))
-
-
-def pieces(e):
-    """Expand a repeated element into its individual pieces (for drawing)."""
-    r = e.get("repeat")
-    if not r:
-        return [e]
-    out, n = [], r["count"]
-    for i in range(n):
-        p = dict(e)
-        p.pop("repeat", None)
-        p.update(x=e["x"] + i * r.get("dx", 0), y=e["y"] + i * r.get("dy", 0), w=e["piece"]["w"], h=e["piece"]["h"])
-        if "height_to" in r:
-            p["height"] = r["_from"] + (r["height_to"] - r["_from"]) * (i / (n - 1) if n > 1 else 0)
-        out.append(p)
-    return out
-
-
-def on_floor(e):
-    return (e["z"] <= TOL and e.get("kind") != "overhead" and e.get("shape") not in ("frame", "extrusion")
+def on_floor(e, tol):
+    return (e["z"] <= tol and e.get("kind") != "overhead" and e.get("shape") not in ("frame", "extrusion")
             and not e.get("contains"))
 
 
@@ -138,57 +134,70 @@ def union(members):
             "leg": all(b.get("leg") for b in members)}
 
 
-def problems(spec):
-    """Return (errors, warnings) for a spec; check() prints them."""
-    W, D, H = spec["width"], spec["depth"], spec.get("max_height")
-    k = unit_factor(spec)
-    WALKWAY = spec.get("walkway", WALKWAY_M * k)
-    HEADROOM = spec.get("headroom", HEADROOM_M * k)
-    errors, warnings = [], []
+def _thresholds(th: dict | None) -> dict:
+    return {**common.DEFAULTS, **(th or {})}
+
+
+def problems(spec: dict, th: dict | None = None) -> list[Finding]:
+    """Geometry findings for a normalised spec: GEO-FIT and GEO-PROGRAM errors, GEO-ADVICE warnings."""
+    th = _thresholds(th)
+    W, D, H = spec["width"], spec["depth"], spec["max_height"]
+    k = common.unit_factor(spec.get("unit", "m"))
+    tol = th["geometry_tol"] * k
+    WALKWAY = spec.get("walkway", th["walkway_m"] * k)
+    HEADROOM = spec.get("headroom", th["headroom_m"] * k)
+    SPAN = th["span_m"] * k
+    out: list[Finding] = []
+
+    def fit(where, rule, text):
+        out.append(Finding("GEO-FIT", "error", where, f"{rule}: {text}"))
+
+    def advice(where, rule, text):
+        out.append(Finding("GEO-ADVICE", "warn", where, f"{rule}: {text}"))
+
     for e in spec["elements"]:
-        name = f'{e["id"]} {e.get("label", "")}'.strip()
-        if e["x"] < -TOL or e["y"] < -TOL or e["x"] + e["w"] > W + TOL or e["y"] + e["h"] > D + TOL:
-            errors.append(f"{name}: outside the {W} × {D} footprint "
-                          f"(x {e['x']}–{e['x'] + e['w']:.2f}, y {e['y']}–{e['y'] + e['h']:.2f})")
-        if "height" not in e:
-            warnings.append(f"{name}: no height given")
-        elif H and e["z"] + e["height"] > H + TOL:
-            errors.append(f"{name}: top at {e['z'] + e['height']:.2f} exceeds the {H} height limit")
+        eid = e["id"]
+        top = element_top(e)
+        if e["x"] < -tol or e["y"] < -tol or e["x"] + e["w"] > W + tol or e["y"] + e["h"] > D + tol:
+            fit(eid, "footprint", f"outside the {W} × {D} footprint "
+                                  f"(x {e['x']}–{e['x'] + e['w']:.2f}, y {e['y']}–{e['y'] + e['h']:.2f})")
+        if "height" not in e and not (e.get("shape") == "extrusion" and e.get("profile")):
+            advice(eid, "noheight", "no height given")
+        if top > H + tol:
+            fit(eid, "height", f"top at {top:.2f} exceeds the {H} height limit")
         if e.get("shape") == "frame" and "height" in e:
-            clear = e["height"] - e.get("band", 0.3)
+            clear = e["height"] - e.get("band", 0.3 * k)
             if clear < HEADROOM:
-                errors.append(f"{name}: clear opening {clear:.2f} is below {HEADROOM} headroom")
+                fit(eid, "headroom", f"clear opening {clear:.2f} is below {round(HEADROOM, 2)} headroom")
         if e.get("shape") == "extrusion":
             prof = e.get("profile", [])
             span, along = (e["w"], "width") if e.get("axis", "x") == "x" else (e["h"], "depth")
-            if prof and (max(p[0] for p in prof) > span + TOL or min(p[0] for p in prof) < -TOL):
-                errors.append(f"{name}: profile runs outside its {along} {span}")
-            if prof and H and max(p[1] for p in prof) > H + TOL:
-                errors.append(f"{name}: profile rises above the {H} height limit")
-        if e.get("kind") == "overhead" and e.get("shape") not in ("frame", "extrusion") and e["z"] < HEADROOM - TOL:
-            warnings.append(f"{name}: underside at {e['z']:.2f}, below {HEADROOM} headroom")
-        top_e = e["z"] + e.get("height", 0)
+            if prof and (max(p[0] for p in prof) > span + tol or min(p[0] for p in prof) < -tol):
+                fit(eid, "profile", f"profile runs outside its {along} {span}")
+        if e.get("kind") == "overhead" and e.get("shape") not in ("frame", "extrusion") and e["z"] < HEADROOM - tol:
+            advice(eid, "underside", f"underside at {e['z']:.2f}, below {round(HEADROOM, 2)} headroom")
         for zone in spec.get("height_zones", []):
-            if e["y"] < zone["y_to"] - TOL and e["y"] + e["h"] > zone["y_from"] + TOL and top_e > zone["max"] + TOL:
-                errors.append(f"{name}: top at {top_e:.2f} exceeds {zone['max']} in the band y {zone['y_from']}–{zone['y_to']}"
-                              + (f" ({zone['note']})" if zone.get("note") else ""))
+            if e["y"] < zone["y_to"] - tol and e["y"] + e["h"] > zone["y_from"] + tol and top > zone["max"] + tol:
+                fit(eid, "zone-height",
+                    f"top at {top:.2f} exceeds {zone['max']} in the band y {zone['y_from']}–{zone['y_to']}"
+                    + (f" ({zone['note']})" if zone.get("note") else ""))
         structural = e.get("kind") == "overhead" or e.get("shape") in ("frame", "extrusion")
         if structural:
             support = e.get("support")
             if not support:
-                warnings.append(f"{name}: state how it is supported (floor, wall, legs, columns or hung)")
+                advice(eid, "support", "state how it is supported (floor, wall, legs, columns or hung)")
             elif support == "hung":
                 if spec.get("rigging_allowed") is False:
-                    errors.append(f"{name}: hung, but the venue does not allow rigging")
+                    fit(eid, "rigging", "hung, but the venue does not allow rigging")
                 elif spec.get("rigging_allowed") is None:
-                    warnings.append(f"{name}: hung, but rigging is not confirmed by the venue")
-            elif support == "wall" and e["w"] > SPAN_M * k + TOL:
-                warnings.append(f"{name}: spans {e['w']:.2f} from a single wall; add columns or have the structure reviewed")
-    floor = [e for e in spec["elements"] if on_floor(e)]
+                    advice(eid, "rigging-unconfirmed", "hung, but rigging is not confirmed by the venue")
+            elif support == "wall" and e["w"] > SPAN + tol:
+                advice(eid, "span", f"spans {e['w']:.2f} from a single wall; add columns or have the structure reviewed")
+    floor = [e for e in spec["elements"] if on_floor(e, tol)]
     legs = []
     for e in spec["elements"]:
         if e.get("shape") == "frame":
-            band = e.get("band", 0.3)
+            band = e.get("band", 0.3 * k)
             for side, lx in (("left leg", e["x"]), ("right leg", e["x"] + e["w"] - band)):
                 legs.append({"id": f'{e["id"]} {side}', "x": lx, "y": e["y"], "w": band, "h": e["h"], "leg": True,
                              "group": e.get("group")})
@@ -196,44 +205,80 @@ def problems(spec):
     for g in dict.fromkeys(b["group"] for b in floor + legs if b.get("group") is not None):
         bodies.append(union([b for b in floor + legs if b.get("group") == g]))
     for a, b in itertools.combinations(bodies, 2):
+        pair = f"{a['id']} / {b['id']}"
         d, dx, dy = gap(a, b)
         if a.get("leg") or b.get("leg"):
             ox = min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"])
             oy = min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"])
-            if ox > TOL and oy > TOL and not (a.get("leg") and b.get("leg")):
-                errors.append(f"{a['id']} and {b['id']} overlap on the floor")
+            if ox > tol and oy > tol and not (a.get("leg") and b.get("leg")):
+                fit(pair, "overlap", f"{a['id']} and {b['id']} overlap on the floor")
             continue
-        if dx <= TOL and dy <= TOL:
+        if dx <= tol and dy <= tol:
             overlap_x = min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"])
             overlap_y = min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"])
-            if overlap_x > TOL and overlap_y > TOL:
-                errors.append(f"{a['id']} and {b['id']} overlap on the floor")
-        elif d < WALKWAY - TOL:
-            warnings.append(f"{a['id']} and {b['id']}: only {d:.2f} apart (walkway guide {WALKWAY})")
+            if overlap_x > tol and overlap_y > tol:
+                fit(pair, "overlap", f"{a['id']} and {b['id']} overlap on the floor")
+        elif d < WALKWAY - tol:
+            advice(pair, "walkway", f"{a['id']} and {b['id']}: only {d:.2f} apart (walkway guide {round(WALKWAY, 2)})")
     served = set()
     for e in spec["elements"]:
         p = e.get("program", [])
         served.update([p] if isinstance(p, str) else p)
     for item in spec.get("required", []):
         if item not in served:
-            errors.append(f"required program item '{item}' is not served by any element")
-    return errors, warnings
+            out.append(Finding("GEO-PROGRAM", "error", "required",
+                               f"program: required program item '{item}' is not served by any element"))
+    return out
 
 
-def check(spec):
-    W, D, H = spec["width"], spec["depth"], spec.get("max_height")
-    k = unit_factor(spec)
-    errors, warnings = problems(spec)
-    used = sum(e["w"] * e["h"] for e in spec["elements"] if on_floor(e))
-    print(f"GEOMETRY CHECK · {spec.get('title', '')} · {W} × {D}, max height {H}")
-    print(f"Floor elements cover {used:.1f} of {W * D:.1f} ({used / (W * D):.0%}); "
-          f"walkway {spec.get('walkway', WALKWAY_M * k):.2f}, headroom {spec.get('headroom', HEADROOM_M * k):.2f} {spec.get('unit', 'm')}")
-    for m in errors:
-        print("ERROR  ", m)
-    for m in warnings:
-        print("WARNING", m)
-    print("RESULT: PASS" if not errors else "RESULT: FAIL – change the design, update the spec, then re-render the affected views")
-    return not errors
+def facts(spec: dict) -> dict:
+    """Numbers and names of a normalised spec, in the spec's unit (3 decimals): size, highest point, floor cover,
+    one zone per distinct label (numbered as the plan numbers them), the program served and what is missing."""
+    k = common.unit_factor(spec.get("unit", "m"))
+    tol = common.DEFAULTS["geometry_tol"] * k
+    els = spec["elements"]
+
+    def r(v):
+        return round(v, 3)
+
+    served = set()
+    for e in els:
+        p = e.get("program", [])
+        served.update([p] if isinstance(p, str) else p)
+    zones = []
+    for label, n in common.zone_numbers(els).items():
+        members = [e for e in els if e.get("label") == label]
+        prog = set()
+        for e in members:
+            p = e.get("program", [])
+            prog.update([p] if isinstance(p, str) else p)
+        zones.append({"n": n, "label": label, "kind": members[0].get("kind", "zone"), "program": sorted(prog),
+                      "top": r(max(element_top(e) for e in members))})
+    return {
+        "unit": spec.get("unit", "m"),
+        "width": r(spec["width"]), "depth": r(spec["depth"]), "max_height": r(spec["max_height"]),
+        "highest_point": r(max(element_top(e) for e in els)),
+        "open_sides": list(spec.get("open_sides", [])),
+        "area": r(spec["width"] * spec["depth"]),
+        "floor_cover": r(sum(e["w"] * e["h"] for e in els if on_floor(e, tol))),
+        "zones": zones,
+        "program_served": sorted(served),
+        "required_missing": [i for i in spec.get("required", []) if i not in served],
+    }
+
+
+def check(spec: dict, th: dict, extra: list[Finding], as_json: bool) -> int:
+    th = _thresholds(th)
+    W, D, H = spec["width"], spec["depth"], spec["max_height"]
+    k = common.unit_factor(spec.get("unit", "m"))
+    tol = th["geometry_tol"] * k
+    if not as_json:
+        used = sum(e["w"] * e["h"] for e in spec["elements"] if on_floor(e, tol))
+        print(f"GEOMETRY CHECK · {spec.get('title', '')} · {W} × {D}, max height {H}")
+        print(f"Floor elements cover {used:.1f} of {W * D:.1f} ({used / (W * D):.0%}); "
+              f"walkway {spec.get('walkway', th['walkway_m'] * k):.2f}, "
+              f"headroom {spec.get('headroom', th['headroom_m'] * k):.2f} {spec.get('unit', 'm')}")
+    return common.print_findings(list(extra) + problems(spec, th), as_json)
 
 
 def hints(spec):
@@ -295,7 +340,7 @@ def element_bodies(spec):
         if s not in spec.get("open_sides", []) and wall_h:
             poly = [(x0, y0, 0), (x1, y1, 0), (x1, y1, wall_h), (x0, y0, wall_h)]
             out.append(((min(x0, x1), min(y0, y1), 0, max(x0, x1), max(y0, y1), wall_h), [poly], "wall", -1))
-    for e in [p for el in spec["elements"] for p in pieces(el)]:
+    for e in [p for el in spec["elements"] for p in common.expand_repeat(el)]:
         key = "hero" if e.get("kind") == "hero" or e.get("shape") == "frame" else "body"
         layer = e.get("layer", 0)
         if e.get("shape") == "cylinder":
@@ -308,10 +353,11 @@ def element_bodies(spec):
     return out
 
 
-def person_body(px, py, k, cam):
-    """A 1.75 m person for scale: a body and a head disc facing the camera."""
+def person_body(px, py, k, cam, s=1.0):
+    """A person for scale (1.75 m times s): a body and a head disc facing the camera."""
     import numpy as np
     n = 20
+    k = k * s
     a = [2 * math.pi * i / n for i in range(n + 1)]
     ring = [(px + 0.18 * k * math.cos(t), py + 0.12 * k * math.sin(t)) for t in a]
     polys = [[(*ring[i], 0), (*ring[i + 1], 0), (*ring[i + 1], 1.5 * k), (*ring[i], 1.5 * k)] for i in range(n)]
@@ -321,14 +367,14 @@ def person_body(px, py, k, cam):
     return ((px - 0.18 * k, py - 0.12 * k, 0, px + 0.18 * k, py + 0.12 * k, 1.75 * k), polys, "person", 0)
 
 
-def paint_order(aabbs, eye):
+def paint_order(aabbs, eye, tol):
     """Back-to-front order for axis-aligned boxes seen from the point eye.
 
     A may be painted before B when an axis-aligned plane separates them with the eye on B's side: every ray from
     the eye to B stays on B's side, so A can never cover B. Exact for every non-intersecting pair; intersecting
     boxes give no constraint and fall back to centre distance (use "layer" for those)."""
     def clears(a, b):
-        return any((a[i + 3] <= b[i] + TOL and eye[i] >= a[i + 3] - TOL) or (b[i + 3] <= a[i] + TOL and eye[i] <= a[i] + TOL)
+        return any((a[i + 3] <= b[i] + tol and eye[i] >= a[i + 3] - tol) or (b[i + 3] <= a[i] + tol and eye[i] <= a[i] + tol)
                    for i in range(3))
 
     before = [set() for _ in aabbs]
@@ -395,13 +441,13 @@ class Camera:
         return np.column_stack([(x + 1) / 2 * size[0], (self.aspect - y) / (2 * self.aspect) * size[1]])
 
 
-def preset(spec, view, aspect, person_xy):
+def preset(spec, view, aspect, person_xy, s=1.0):
     """Appendix cameras, fitted so the whole stand and the scale person fill about 86 % of the frame.
     hero: eye level 1.6 m from the open front corner, 35 mm. front: eye level 1.6 m on the main aisle, 10 degrees off
     the centre line, 35 mm. A spec may fix a camera: "camera": {"hero": {"eye": [x, y, z], "target": [x, y, z], "lens_mm": 35}}."""
     import numpy as np
-    W, D, k = spec["width"], spec["depth"], unit_factor(spec)
-    top = max(e["z"] + e.get("height", 0) for e in spec["elements"])
+    W, D, k = spec["width"], spec["depth"], common.unit_factor(spec.get("unit", "m"))
+    top = max(element_top(e) for e in spec["elements"])
     right = spec.get("camera_corner", "right") == "right"
     fixed = (spec.get("camera") or {}).get(view)
     if fixed:
@@ -414,11 +460,11 @@ def preset(spec, view, aspect, person_xy):
         eye = (W / 2 + s * d * math.sin(math.radians(10)), D + d * math.cos(math.radians(10)), 1.6 * k)
         target = (W / 2, D / 2, min(1.6 * k, 0.45 * top))
     else:
-        raise SystemExit(f"unknown view {view}: use hero or front")
+        raise ValueError(f"unknown view {view}: use hero or front")
     # every vertex the frame must hold: the floor plate, each piece and the scale person
     pts = [(x, y, 0) for x in (0, W) for y in (0, D)]
     pts += [v for _, polys, _, _ in element_bodies(spec) for p in polys for v in p]
-    pts += [(person_xy[0] + sx, person_xy[1] + sy, z) for sx in (-0.2 * k, 0.2 * k) for sy in (-0.2 * k, 0.2 * k) for z in (0, 1.75 * k)]
+    pts += [(person_xy[0] + sx, person_xy[1] + sy, z) for sx in (-0.2 * k * s, 0.2 * k * s) for sy in (-0.2 * k * s, 0.2 * k * s) for z in (0, 1.75 * k * s)]
     pts = np.array(pts, float)
     eye, target = np.array(eye, float), np.array(target, float)
     for _ in range(10):
@@ -435,18 +481,21 @@ def preset(spec, view, aspect, person_xy):
     return Camera(eye, target, 35, aspect)
 
 
-def draw_view(spec, view, size, path):
+def draw_view(spec, view, size, path, th=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.collections import PolyCollection
 
-    W, D, k = spec["width"], spec["depth"], unit_factor(spec)
+    th = _thresholds(th)
+    W, D, k = spec["width"], spec["depth"], common.unit_factor(spec.get("unit", "m"))
+    s = th["person_height_m"] / 1.75
+    tol = th["geometry_tol"] * k
     aspect = size[1] / size[0]
     right = spec.get("camera_corner", "right") == "right"
     person_xy = {"hero": (0.25 * W if right else 0.75 * W, D + 0.6 * k),
                  "front": ((W + 0.6 * k) if right else -0.6 * k, D + 0.3 * k)}[view]
-    cam = preset(spec, view, aspect, person_xy)
+    cam = preset(spec, view, aspect, person_xy, s)
 
     fig = plt.figure(figsize=(size[0] / 100, size[1] / 100), dpi=100)
     fig.patch.set_facecolor(COLOURS["bg"])
@@ -463,11 +512,11 @@ def draw_view(spec, view, size, path):
     m = 40 * k
     add([[(-m, -m, 0), (W + m, -m, 0), (W + m, D + m, 0), (-m, D + m, 0)]], COLOURS["ground"], "none", z=1)
     add([[(0, 0, 0), (W, 0, 0), (W, D, 0), (0, D, 0)]], COLOURS["plate"], COLOURS["plate_edge"], lw=0.8, z=2)
-    bodies = element_bodies(spec) + [person_body(person_xy[0], person_xy[1], k, cam)]
+    bodies = element_bodies(spec) + [person_body(person_xy[0], person_xy[1], k, cam, s)]
     order = []
     for layer in sorted({b[3] for b in bodies}):
         idx = [i for i, b in enumerate(bodies) if b[3] == layer]
-        order += [idx[j] for j in paint_order([bodies[i][0] for i in idx], cam.eye)]
+        order += [idx[j] for j in paint_order([bodies[i][0] for i in idx], cam.eye, tol)]
     for z, i in enumerate(order, start=10):
         _, polys, key, _ = bodies[i]
         faces = sorted(polys, key=lambda p: -sum((sum(v[d] for v in p) / len(p) - cam.eye[d]) ** 2 for d in range(3)))
@@ -476,33 +525,105 @@ def draw_view(spec, view, size, path):
     plt.close(fig)
 
 
-def massing(spec, out, views=("hero", "front"), size=(1536, 1024)):
+def massing(spec, out, views=("hero", "front"), size=(1536, 1024), th=None):
+    """Draw OUTBASE-<view>.png for each view; returns the written paths."""
+    folder = os.path.dirname(out)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    paths = []
     for view in views:
-        draw_view(spec, view, size, f"{out}-{view}.png")
-    print("Massing views written: " + ", ".join(f"{out}-{v}.png" for v in views))
+        path = f"{out}-{view}.png"
+        draw_view(spec, view, size, path, th)
+        paths.append(path)
+    print("Massing views written: " + ", ".join(paths))
+    return paths
+
+
+def _report_input(findings):
+    for f in findings:
+        print(f"{'ERROR':<7} {f.code:<18} {f.where}: {f.message}", file=sys.stderr)
+    return 2
+
+
+def _project(arg):
+    """The project for --project P, or for "." when ./brief/ exists, else None (standalone)."""
+    if arg is not None:
+        return common.find_project(arg)
+    if os.path.isdir("brief"):
+        return common.find_project(".")
+    return None
+
+
+def _build_parser():
+    ap = argparse.ArgumentParser(description="Booth geometry: check, massing, hints, facts")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def add(name, help_):
+        p = sub.add_parser(name, help=help_, description=help_)
+        p.add_argument("spec", metavar="SPEC", help="geometry.json")
+        p.add_argument("--project", default=None, help="project folder (default: . when ./brief/ exists)")
+        return p
+
+    p = add("check", "findings (GEO-*) and a PASS / FAIL result")
+    p.add_argument("--json", action="store_true", help="print the findings as JSON")
+    p = add("massing", "white scaled model images (internal use only)")
+    p.add_argument("out", metavar="OUTBASE", help="output basename: OUTBASE-<view>.png")
+    p.add_argument("--views", default="hero,front", help="hero, front or both (comma separated)")
+    p.add_argument("--size", default="1536x1024", help="image size in pixels, WxH")
+    add("hints", "each element's render_hint")
+    add("facts", "sizes, highest point, zones and program as JSON")
+    return ap, sub.choices["massing"]
 
 
 def main(argv=None):
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")   # Windows consoles choke on × and ·
-    ap = argparse.ArgumentParser(description="Booth geometry: check, massing, hints")
-    ap.add_argument("cmd", choices=["check", "massing", "hints"])
-    ap.add_argument("spec")
-    ap.add_argument("out", nargs="?", help="massing: output basename")
-    ap.add_argument("--views", default="hero,front", help="massing: hero, front or both")
-    ap.add_argument("--size", default="1536x1024", help="massing: image size in pixels, WxH")
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+    ap, mp = _build_parser()
     a = ap.parse_args(argv)
-    spec = load(a.spec)
-    if a.cmd == "check":
-        sys.exit(0 if check(spec) else 1)
-    if a.cmd == "hints":
-        hints(spec)
-        return
-    if not a.out:
-        sys.exit("massing needs an output basename")
-    massing(spec, a.out, [v.strip() for v in a.views.split(",") if v.strip()],
-            tuple(int(v) for v in a.size.lower().split("x")))
+    views, size = (), None
+    if a.cmd == "massing":
+        views = [v.strip() for v in a.views.split(",") if v.strip()]
+        if not views or any(v not in ("hero", "front") for v in views):
+            mp.error("--views takes hero, front or hero,front")
+        parts = a.size.lower().split("x")
+        if len(parts) != 2 or not all(p.isdigit() and int(p) > 0 for p in parts):
+            mp.error("--size must look like 1536x1024")
+        size = (int(parts[0]), int(parts[1]))
+    try:
+        spec, found = load_spec(a.spec)
+        if found:
+            return _report_input(found)
+        project = _project(a.project) if a.cmd in ("check", "massing") else None
+        th = project.thresholds if project else dict(common.DEFAULTS)
+        if a.cmd == "check":
+            return check(spec, th, [], a.json)
+        if a.cmd == "hints":
+            hints(spec)
+            return 0
+        if a.cmd == "facts":
+            print(json.dumps(facts(spec), ensure_ascii=False, indent=2))
+            return 0
+        concept = common.concept_of_path(project, a.spec) if project else None
+        paths = massing(spec, a.out, views, size, th)
+        if project is None:
+            print(f"warning: {a.out}: no project found – sidecar not written", file=sys.stderr)
+        elif concept is None:
+            print(f"warning: {a.out}: spec is not inside a concept folder – sidecar not written", file=sys.stderr)
+        else:
+            for path in paths:
+                common.write_sidecar(path, {
+                    "tool": "booth_geometry.py", "mode": "massing", "set": concept.set, "concept": concept.id,
+                    "inputs": [{"role": "spec", "path": project.rel(a.spec), "sha256": common.sha256_file(a.spec)}],
+                    "prompt_sha256": None, "lint": None})
+        return 0
+    except InputError as e:
+        print(f"{'ERROR':<7} {e.code:<18} {e.where}: {e}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

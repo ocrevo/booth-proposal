@@ -1,12 +1,13 @@
 """Gates for the early steps of a booth proposal project.
 
-Commands: brief [--stamp], frame, ideas [--scaffold], select, renders, report brief|ideas|renders.
+Commands: brief [--stamp], frame, ideas [--scaffold], select, renders, concepts, report brief|ideas|renders|concepts.
 Every command takes --project (default "."), written after the command name.
 Exit codes: 0 done, 1 at least one error finding, 2 bad invocation or unusable input.
 Messages are English and start with the rule name ("stale: ..."); only `report` prints text in
 the project language, taken from the label file named by brief.json "lang".
 Writes: `brief --stamp` -> brief/brief.json; `select` -> brief/selection.json (`--clear` deletes it);
-`ideas --scaffold` -> concepts/<set>/<concept>/; `report --out` -> the named file. Nothing else.
+`ideas --scaffold` -> concepts/<set>/<concept>/; `report --out` -> the named file. Nothing else
+(`concepts` only reads, and only the selected concepts).
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ import sys
 from common import (Finding, InputError, _CONCEPT_ID_RE, _LEGACY_SET, _SET_ID_RE, _images_in, concept_ref,
                     list_concepts, load_labels, now_iso, print_findings, read_front_matter, read_json, read_review,
                     read_sidecar, real, review_is_current_pass, scan_reference_sets, sha256_file, sidecar_version,
-                    trace_base_chain, write_json, find_project)
+                    to_m, trace_base_chain, write_json, find_project)
 
 _BRIEF = "brief/brief.json"
 _IDEAS = "brief/ideas.json"
@@ -501,6 +502,100 @@ def cmd_renders(project, args) -> int:
     return print_findings(findings, args.json)
 
 
+# ---------- concepts ----------
+
+def _concept_geo_findings(project, c, booth_ok: bool) -> list[Finding]:
+    """G-GEO findings for one selected concept: missing | invalid, check, envelope, plan, stale."""
+    import booth_geometry      # imported late: it needs only the standard library and common
+
+    out: list[Finding] = []
+
+    def add(message: str) -> None:
+        out.append(Finding("G-GEO", "error", c.key, message))
+
+    spec_path = os.path.join(c.dir, "geometry.json")
+    spec_rel = project.rel(spec_path)
+    outbase = f"concepts/{c.set}/{c.id}/plan"
+    spec = None
+    if not os.path.isfile(spec_path):
+        add(f"missing: no {spec_rel}")
+    else:
+        try:
+            spec, found = booth_geometry.load_spec(spec_path)
+        except InputError as e:
+            spec, found = None, [Finding(e.code, "error", e.where, str(e))]
+        if found:
+            paths = "; ".join(f"{f.where} {f.message}" for f in found)
+            add(f"invalid: {paths}; run booth_geometry.py check {spec_rel}")
+    if spec is not None:
+        errors = [f for f in booth_geometry.problems(spec, project.thresholds) if f.level == "error"]
+        if errors:
+            codes = ", ".join(sorted({f.code for f in errors}))
+            add(f"check: {len(errors)} error(s) ({codes}); run booth_geometry.py check {spec_rel}")
+        if booth_ok:
+            for msg in _envelope_messages(project, spec):
+                add(f"envelope: {msg}")
+
+    plan_json = os.path.join(c.dir, "plan.json")
+    has_json = os.path.isfile(plan_json)
+    has_image = os.path.isfile(os.path.join(c.dir, "plan.png")) or os.path.isfile(os.path.join(c.dir, "plan.svg"))
+    gone = [name for name, ok in (("plan.json", has_json), ("plan.png or plan.svg", has_image)) if not ok]
+    if gone:
+        add(f"plan: missing {' and '.join(gone)}; run draw_plan.py plan {spec_rel} {outbase}")
+    if has_json and os.path.isfile(spec_path):
+        sc = read_sidecar(os.path.join(c.dir, "plan.png"))
+        inputs = sc.get("inputs") if sidecar_version(sc) == 2 and isinstance(sc.get("inputs"), list) else []
+        specs = [i for i in inputs if isinstance(i, dict) and i.get("role") == "spec"]
+        current = len(specs) == 1 and specs[0].get("path") == spec_rel \
+            and specs[0].get("sha256") == sha256_file(spec_path)
+        if not current:
+            add(f"stale: the plan was not drawn from the current {spec_rel}; "
+                f"run draw_plan.py plan {spec_rel} {outbase}")
+    return out
+
+
+def _envelope_messages(project, spec: dict) -> list[str]:
+    """Rule envelope: width, depth and max_height of the spec against the brief booth (metres, geometry_tol)."""
+    booth = project.brief["booth"]
+    tol = project.thresholds["geometry_tol"]
+    su, bu = spec.get("unit", "m"), booth["unit"]
+    overrides = spec.get("envelope_override") or []
+    out: list[str] = []
+    for fld in ("width", "depth", "max_height"):
+        have, want = to_m(spec[fld], su), to_m(booth[fld], bu)
+        bad = have - want > tol if fld == "max_height" else abs(have - want) > tol
+        if not bad:
+            continue
+        if any(isinstance(o, dict) and o.get("field") == fld and isinstance(o.get("reason"), str)
+               and o["reason"].strip() and abs(to_m(o["value"], su) - have) <= tol for o in overrides):
+            continue
+        out.append(f"{fld} {round(have, 3):g} m ≠ booth {round(want, 3):g} m (no matching envelope_override)")
+    return out
+
+
+def _concepts_run(project) -> tuple[list[Finding], dict]:
+    """(findings in report order, findings by selected key). Selected concepts only; reads, never writes."""
+    sel = project.selection
+    if sel is None:
+        return [Finding("G-SELECT", "error", "brief/selection.json", "no selection: run gates.py select")], {}
+    booth = _frame_problems(project)
+    out: list[Finding] = list(booth)
+    by_key: dict = {}
+    for key in sel["selected"]:
+        try:
+            c = concept_ref(project, key)
+        except InputError as e:
+            by_key[key] = [Finding("G-SELECT", "error", key, str(e))]
+        else:
+            by_key[key] = read_front_matter(c)[1] + _concept_geo_findings(project, c, not booth)
+        out += by_key[key]
+    return out, by_key
+
+
+def cmd_concepts(project, args) -> int:
+    return print_findings(_concepts_run(project)[0], args.json)
+
+
 # ---------- report ----------
 
 def _cell(v) -> str:
@@ -591,9 +686,26 @@ def _report_renders(project, L: dict) -> list[str]:
     return lines
 
 
+def _report_concepts(project, L: dict) -> list[str]:
+    lines = [f"# {L['concepts']}", ""]
+    sel = project.selection
+    if sel is None:
+        return lines + [L["none"]]
+    by_key = _concepts_run(project)[1]
+    rows = []
+    for key in sel["selected"]:
+        errors = [f for f in by_key[key] if f.level == "error"]
+        geometry = L["fail"] + " (" + ", ".join(sorted({f.code for f in errors})) + ")" if errors else L["pass"]
+        plan = f"concepts/{key}/plan.png"
+        rows.append({"display": sel["display"].get(key, ""), "concept": key, "geometry": geometry,
+                     "plan": plan if os.path.isfile(project.path(*plan.split("/"))) else L["none"]})
+    return lines + _table(["display", "concept", "geometry", "plan"], rows, L["none"])
+
+
 def cmd_report(project, args) -> int:
     L = _report_labels(project)
-    builders = {"brief": _report_brief, "ideas": _report_ideas, "renders": _report_renders}
+    builders = {"brief": _report_brief, "ideas": _report_ideas, "renders": _report_renders,
+                "concepts": _report_concepts}
     lines = builders[args.what](project, L)
     text = "\n".join(lines) + "\n"
     if args.out:
@@ -610,7 +722,7 @@ def cmd_report(project, args) -> int:
 # ---------- entry point ----------
 
 def _build_parser():
-    ap = argparse.ArgumentParser(description="Booth proposal gates: brief, frame, ideas, select, renders, report")
+    ap = argparse.ArgumentParser(description="Booth proposal gates: brief, frame, ideas, select, renders, concepts, report")
     sub = ap.add_subparsers(dest="cmd", required=True)
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--project", default=".", help="project folder (default: current folder)")
@@ -637,8 +749,11 @@ def _build_parser():
                    help="only these concepts (<set>/<concept>)")
     p.add_argument("--json", action="store_true")
 
+    p = sub.add_parser("concepts", parents=[common], help="check geometry and plan of the selected concepts")
+    p.add_argument("--json", action="store_true")
+
     p = sub.add_parser("report", parents=[common], help="Markdown summary for the user")
-    p.add_argument("what", choices=["brief", "ideas", "renders"])
+    p.add_argument("what", choices=["brief", "ideas", "renders", "concepts"])
     p.add_argument("--out", metavar="FILE", help="write the Markdown to this file")
     return ap, sel
 
