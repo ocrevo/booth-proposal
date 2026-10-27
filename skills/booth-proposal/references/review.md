@@ -1,7 +1,5 @@
 # Review
 
-The deck review follows in phase 3.
-
 ## Image review
 
 A render reaches the proposal only after a reviewer has looked at it without knowing what it was meant to be. Code records the answer, works out the size deviation and computes the verdict.
@@ -106,3 +104,92 @@ After choosing, run `python scripts/render.py sheet --set <set> --chosen`. It la
 - No two chosen renders of one set may share the same counter, seating and back wall.
 - If two read as the same stand, push the weaker idea further and render it again.
 - Show the row to the user.
+
+## Deck review – when
+
+Once every page is filled:
+
+1. `python scripts/deck.py check`, then `python scripts/deck.py render`. Fix until render reports zero overflow.
+2. Pass 1, then pass 2 (below).
+3. `python scripts/deck.py review --record work/deck-review.input.json`.
+4. `python scripts/deck.py export`. When check now reports D-REF `stale`, run `deck.py render` first: coverage quotes decide which pages a design-point reference names.
+
+Export refuses while check has errors, the render is missing, stale or shows overflow, or the record is missing, stale, holds an unresolved pass-2 finding or a pending word without `keep`.
+
+The record holds a hash of each page's `deck.py text` block and of its images. Layout-only edits, such as a class or a style, keep the record. After a text or image change, run `python scripts/deck.py text --diff`: it lists the pages `ADDED`, `REMOVED` and `CHANGED` since the record and prints only those. Review them again in both passes and record them; a changed page loses its recorded items, coverage quotes and pending decisions included.
+
+## Pass 1 – cold read (text only)
+
+The reviewer reads the deck as the client will. They get only:
+- the output of `python scripts/deck.py text`;
+- the design points as `id: text` lines, without sources;
+- the pending findings of `deck.py check` as code, page and word, for example `D-TXT-PENDING b-board "builds on"`.
+
+They never get the images, the brief, the references or the concept notes.
+
+Their answer fills four lists in `pass1`:
+- `unexplained`: a reference or comparison with nothing earlier in the deck to point to ("as before", "the familiar arch"). Each item is `{page_id, quote, action}`, with `action` `rewritten` or `kept`.
+- `internal_notes`: working notes, IDs, file names, anything meant for the team. Same shape.
+- `coverage`: one item per design point, `{point, page_id, quote}`, the quote copied verbatim from that page's text block.
+- `pending`: one item per pending finding, `{code, page_id, text, decision, note}`, with `text` the word as check prints it. `narrates_reference`: the word tells the story of a reference or an earlier stand; rewrite the page so the word is gone. `keep`: brand language. Example: "延续品牌蓝" → `keep`; "延续上一届的造型" → `narrates_reference`.
+
+## Pass 2 – images against words
+
+The reviewer gets:
+- `work/contact.png`;
+- each placed render's `.review.json`;
+- `python scripts/booth_geometry.py facts concepts/<set>/<concept>/geometry.json` for each selected concept;
+- the output of `deck.py text`.
+
+They check that:
+- the words describe what is visible; anything the image does not show is worded as design intent;
+- counts, names and positions match the image and the facts;
+- titles are claims, not labels;
+- the cover uses the strongest image;
+- adjacent pages differ in layout;
+- each page has one hero.
+
+Their answer fills `pass2.findings`, each `{page_id, kind, note, resolved}`. `kind` is one of `mismatch`, `design_intent`, `title_is_label`, `cover`, `adjacent_layout`, `other`. Fix what you can and set `resolved` to `true`; an item left `false` blocks export.
+
+## Recording
+
+Write both answers to `work/deck-review.input.json`:
+
+```json
+{
+  "pass1": {
+    "reviewer": "subagent",
+    "unexplained": [{"page_id": "b-board", "quote": "As before, the lounge faces the aisle.", "action": "rewritten"}],
+    "internal_notes": [{"page_id": "compare", "quote": "Seat count to follow", "action": "rewritten"}],
+    "coverage": [
+      {"point": "D1", "page_id": "a-board", "quote": "A deck you walk onto from two sides."},
+      {"point": "D2", "page_id": "b-annotated", "quote": "Tidewater Pass holders check in at the bow counter."}
+    ],
+    "pending": [{"code": "D-TXT-PENDING", "page_id": "b-board", "text": "builds on", "decision": "keep",
+                 "note": "Builds on the Nordvik Ferries harbour blue: brand language."}]
+  },
+  "pass2": {
+    "reviewer": "subagent",
+    "findings": [
+      {"page_id": "a-board", "kind": "mismatch", "note": "Text said four kiosks; image and facts show three.", "resolved": true},
+      {"page_id": "compare", "kind": "title_is_label", "note": "Title rewritten as a claim.", "resolved": true}
+    ]
+  }
+}
+```
+
+Then run `python scripts/deck.py review --record work/deck-review.input.json`.
+
+- **Exit 2** (`C-INPUT`): the input does not match the shape. The message gives the JSON path.
+- **Exit 1**: nothing was written. Each problem is an `error:` line: a coverage quote not found on its page, a pending word without a decision, or a page that still contains a word decided `narrates_reference`. Fix the input or the page and record again.
+- **Exit 0**: code writes `work/deck-review.json`, stamped with every page's hashes and the time. Only code writes hashes and times.
+
+Recording again merges: an old item stays while its page is unchanged and no new item of the same list names that page. An input may therefore hold only `pass2`.
+
+## Without a subagent
+
+Run pass 1 yourself in a fresh turn, with only its inputs. Do not re-open the references. Record it with `"reviewer": "self"` and tell the user the cold read was not independent.
+
+## What the user sees
+
+Show the pass-2 findings with `work/contact.png`: for each, the page, what was wrong and whether it is resolved.

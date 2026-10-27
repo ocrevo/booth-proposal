@@ -1,26 +1,39 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Booth proposal – deck template</title>
 <!--
-  BOOTH PROPOSAL DECK – design system and component library (generic, client-neutral).
+  BOOTH PROPOSAL DECK v2 – design system and component library (generic, client-neutral, language-neutral).
 
   How deck.py uses this file  (comments in this file never contain literal tags, so regexes on tags are safe)
-  - style#tokens  : the ONLY block deck.py rewrites, from brief/deck-style.json (colours, --sans, --header, --stamp).
-                    Missing keys fall back to the :where(:root) defaults inside style#design.
+  - style#tokens  : the single palette. Colours, --sans, --header, --stamp, --rec-label, --todo-label and
+                    --claim-label live only here. deck.py new writes the block and deck.py style rewrites it,
+                    from brief/deck-style.json and the labels file of the brief language.
   - style#design  : copied verbatim into pack/proposal.html (self-contained, no external CSS/JS/fonts).
   - script#viewer : copied verbatim, last element of body.
-  - html[lang]    : "zh-CN" or "en" (deck-style.lang). Chrome labels (推荐方案 / Recommended,
-                    待补充 / To supply) switch on it automatically.
-  - Each section.slide.LAYOUT below is the reference markup for one component.
-    Text slots: data-slot="name", optional data-max="N" (CJK char or Latin letter = 1).
-    Unfilled slots hold the literal text "TODO" or "TODO: hint".
-    Slots named lbl-* carry the fixed zh label; replace them for lang=en.
-  - Renders:      figure.render containing one img, src relative to pack/ (stamped automatically)
-    Other images: figure.pic containing one img (no stamp; add class "contain" to letterbox, e.g. plans)
-    Missing item: div.placeholder with data-todo="what is missing" and visible text
+  - html[lang]    : the brief language, set by deck.py new.
+  - Examples      : each section.slide.LAYOUT[.VARIANT] below is the reference markup of one component.
+                    data-roles="role ..." lists the slide roles it serves; the first becomes the emitted
+                    data-role (deck.py layouts --emit LAYOUT[:VARIANT]), and data-roles itself is removed.
+  - Text slots    : data-slot="name" with an optional data-max="N" (N chars; a CJK character or a Latin
+                    letter counts 1; --emit multiplies N by the language's budget_factor).
+                    Every unfilled leaf slot starts with the literal text "TODO" or "TODO: hint".
+  - data-repeat   : data-repeat="group" marks the repeat units of an example (one group per example);
+                    --emit --count N keeps or clones units and renumbers their slots and numbers.
+  - data-img      : "render", "plan" or "logo" on every img (informational: what belongs there).
+                    Template images are data: placeholders; --emit empties src; deck paths are relative to pack/.
+  - data-auto     : an element filled by --emit and new with the labels value at that dotted key
+                    ({} = the nearest data-concept letter).
+  - Renders       : figure.render holding one img, stamped by CSS with --stamp.
+    Plans, site   : figure.pic.contain holding one img (no stamp, letterboxed).
+    Annotations   : figure.render.annotated holding one img and .pin callouts; data-x and data-y place a
+                    pin in percent of the figure (the viewer script sets left and top).
+  - data-claim    : data-claim="Cn" on an element marks a claim awaiting client sign-off; the ID never shows,
+                    CSS draws the --claim-label tag after the element.
+  - data-ref      : a design-point ID or a page data-id; deck.py render writes the page reference text
+                    (data-ref-style="num" for a bare page number). Never typed by hand.
   - Viewer: ?slide=N shows only slide N at exactly 1920x1080 (screenshots);
             ?check=1 writes JSON [{slide,id,slot,overflow_px}] into pre#overflow-report (appended last in body).
   - Print: Chrome "Save as PDF" / --print-to-pdf gives one 1920x1080 page per slide, backgrounds kept.
@@ -41,23 +54,18 @@
   --brand-extra:#6B8A8E;
   --warn:#C27C12;
   --sans:"Microsoft YaHei","PingFang SC","Noto Sans SC","Source Han Sans SC","Helvetica Neue","Segoe UI",Arial,sans-serif;
-  --header:"TODO 客户 · 展会 · 展台设计提案";
-  --stamp:"草案 – 概念示意，非施工图 · Draft – concept visualization, not for construction";
+  --header:"";
+  --stamp:"";
+  --rec-label:"Recommended";
+  --todo-label:"To supply";
+  --claim-label:"To be confirmed";
 }
 </style>
 <style id="design">
 /* =====================================================================
-   0. DEFAULTS  (specificity 0, so anything in #tokens wins)
+   0. DEFAULTS  (specificity 0; colours, fonts and labels come only from #tokens)
    ===================================================================== */
 :where(:root){
-  /* colour – a neutral studio palette */
-  --paper:#FAFAF7; --surface:#F1F0EB; --tint:#E6E4DD; --line:#D6D3CA;
-  --muted:#A19D93; --muted-text:#6C685F; --ink:#26251F; --ink-strong:#121210;
-  --primary:#22313B; --accent:#A8743F; --brand-extra:#6B8A8E; --warn:#C27C12;
-  --sans:"Microsoft YaHei","PingFang SC","Noto Sans SC","Source Han Sans SC","Helvetica Neue","Segoe UI",Arial,sans-serif;
-  --header:"";
-  --stamp:"Draft – concept visualization, not for construction";
-
   /* type scale (px at 1920 x 1080) */
   --fs-display:200px;  /* concept letters, divider numbers – light */
   --fs-cover:72px;     /* cover and divider titles – bold */
@@ -79,12 +87,9 @@
   /* grid: 12 columns of 110 px, 40 px gutters, 80 px outer margins */
   --m:80px; --g:40px;
 
-  /* chrome labels, switched by <html lang> */
-  --rec-label:"推荐方案"; --todo-label:"待补充"; --covers-label:"回应要点";
   --chrome:var(--muted-text);
   --on-accent:#fff;   /* text on accent tags; deck.py switches it to --ink-strong when white is too faint */
 }
-:where(:root:lang(en)){ --rec-label:"Recommended"; --todo-label:"To supply"; --covers-label:"Responds to"; }
 
 /* =====================================================================
    1. BASE
@@ -142,7 +147,7 @@ h1,h2,h3,.say,.man{text-wrap:balance}  /* manifestos break into even lines, not 
 .slide.dark .label,.slide.dark .micro{color:rgba(255,255,255,.62)}
 
 /* =====================================================================
-   3. IMAGES, STAMP, PLACEHOLDER
+   3. IMAGES, STAMP, PLACEHOLDER, CLAIM TAG
    ===================================================================== */
 figure.render,figure.pic{position:relative;overflow:hidden;margin:0;min-width:0;min-height:0;background:var(--tint)}
 figure.render>img,figure.pic>img{display:block;width:100%;height:100%;object-fit:cover}
@@ -164,6 +169,12 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 /* on dark pages the panel stays dark: a missing image must not become the brightest thing on the page */
 .stage .placeholder,.divider .placeholder,.slide.dark .placeholder{background:color-mix(in srgb,var(--warn) 10%,transparent);color:rgba(255,255,255,.82)}
 
+/* a claim the client must sign off: data-claim="Cn" on the element (the ID never shows); the tag is drawn here */
+[data-claim]::after{content:var(--claim-label);display:inline-block;margin-left:.6em;padding:1px 8px;vertical-align:.18em;
+  font-size:13px;font-weight:400;line-height:18px;letter-spacing:.06em;white-space:nowrap;text-transform:none;
+  color:var(--muted-text);background:var(--paper);border:1px solid var(--line)}
+.slide.dark [data-claim]::after,.stage [data-claim]::after{color:rgba(255,255,255,.72);background:transparent;border-color:rgba(255,255,255,.3)}
+
 /* =====================================================================
    4. COMPONENTS
    ===================================================================== */
@@ -173,7 +184,6 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .cover::before,.cover::after{content:none}
 .logo-tile{z-index:4}
 .logo-tile img{max-height:64px;max-width:280px;width:auto;height:auto;object-fit:contain}
-.logo-ph{display:inline-block;padding:10px 18px;border:1.5px solid var(--line);font-size:var(--fs-micro);letter-spacing:.24em;color:var(--muted-text)}
 .cover .eyebrow{font-size:var(--fs-label);letter-spacing:.18em;line-height:1.5}
 .cover .ctitle{font-size:var(--fs-cover);font-weight:700;line-height:1.2;letter-spacing:.01em}
 .cover .csub{font-size:var(--fs-lead);font-weight:300;line-height:1.5}
@@ -201,7 +211,6 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 
 /* ---------- agenda ---------- */
 .agenda{display:grid;grid-template-columns:560px minmax(0,1fr);column-gap:190px;padding-top:140px}
-.agenda .ah .alt{margin-bottom:20px}
 .agenda .ah h1{font-size:var(--fs-cover);font-weight:700;line-height:1.15;color:var(--ink-strong)}
 .agenda .ah .rule-s{margin-top:40px;width:72px;height:6px;background:var(--primary)}
 .agenda ol{border-top:1px solid var(--ink-strong);align-self:start}
@@ -233,26 +242,26 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .statement .by{margin-top:56px;font-size:var(--fs-small);line-height:1.6;color:var(--muted-text);max-width:1010px}
 
 /* ---------- cards (n2 / n3 / n4 / n6) ---------- */
-.cards .body{display:flex;flex-direction:column;gap:48px}
+/* the grid follows the lead and each card reads top down (number, then text): no band inside or above the cards */
+.cards .body{display:flex;flex-direction:column;gap:56px}
 .cards .lead{flex:none;max-width:1310px}
-.cards .grid{flex:1 1 auto;min-height:0;max-height:500px;margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:var(--g)}
-.cards.n6 .grid{max-height:none}
+.cards .grid{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--g);align-items:stretch}
 .cards.n2 .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .cards.n4 .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .card{position:relative;display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:40px 40px 40px 48px;background:var(--surface)}
 .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
 .card .k{font-size:var(--fs-label);font-weight:700;letter-spacing:var(--track-label);color:var(--accent);line-height:1.5}
 .card .num{font-size:56px;font-weight:300;line-height:1;color:var(--accent);font-variant-numeric:lining-nums}
-.card .txt{margin-top:auto;padding-top:24px}
+.card .txt{padding-top:32px}
 .card h3{font-size:var(--fs-h2);font-weight:700;line-height:1.35;color:var(--ink-strong)}
-.card .txt p{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink);margin-top:14px}
+.card .txt p:not(.k){font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink);margin-top:14px}
 .card .txt .k{margin-bottom:10px}
 .card .tags{margin-top:20px;font-size:var(--fs-micro);letter-spacing:.08em;color:var(--muted-text)}
 .cards.n4 .card,.cards.n6 .card{padding:32px 32px 32px 40px}
 .cards.n4 h3,.cards.n6 h3{font-size:var(--fs-h3)}
-.cards.n4 .card .txt p,.cards.n6 .card .txt p{font-size:19px;line-height:1.6;margin-top:10px}
+.cards.n4 .card .txt p:not(.k),.cards.n6 .card .txt p:not(.k){font-size:19px;line-height:1.6;margin-top:10px}
 .cards.n6 .num{font-size:40px}
-.cards.n6 .txt{padding-top:12px}
+.cards.n6 .txt{padding-top:20px}
 
 /* ---------- facts (key–value list + image) ---------- */
 .facts .body{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));column-gap:var(--g)}
@@ -264,7 +273,7 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .facts dd{font-size:24px;line-height:1.45;color:var(--ink-strong)}
 .facts .body>figure,.facts .body>.placeholder{grid-column:7 / span 6}
 
-/* ---------- overview (three concepts side by side) ---------- */
+/* ---------- overview (concepts side by side) ---------- */
 /* one column per concept (2, 3 or 4), equal widths; with two, the renders are cropped to keep the text on the page */
 .overview .body{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);column-gap:var(--g);align-items:start}
 .opt{position:relative;display:flex;flex-direction:column;min-width:0}
@@ -272,7 +281,6 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .opt .nm{display:flex;align-items:baseline;gap:20px;margin-top:32px}
 .opt .letter{font-size:72px}
 .opt h2{font-size:36px;font-weight:700;line-height:1.25;color:var(--ink-strong)}
-.opt .alt{margin-top:6px;font-size:var(--fs-micro)}
 .opt .man{margin-top:20px;padding-top:20px;border-top:1px solid var(--line);font-size:var(--fs-body);font-weight:700;line-height:1.5;color:var(--ink-strong)}
 .opt .idea{margin-top:10px;font-size:var(--fs-small);line-height:1.65;color:var(--muted-text)}
 .opt.rec::before{content:var(--rec-label);position:absolute;top:0;left:0;z-index:4;padding:9px 18px;
@@ -285,7 +293,6 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .board .letter{font-size:var(--fs-display);margin-top:6px}
 .board .names{margin-top:auto}
 .board .name{font-size:var(--fs-name);font-weight:700;line-height:1.25;color:var(--ink-strong)}
-.board .alt{margin-top:10px}
 .board .rule-s{margin:36px 0 32px}
 .board .man{font-size:var(--fs-lead);font-weight:700;line-height:1.45;color:var(--ink-strong)}
 .board .para{margin-top:20px;font-size:20px;line-height:1.7;color:var(--muted-text)}
@@ -298,6 +305,20 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .board.mirror{grid-template-columns:1200px 480px}
 .board.mirror .txt{order:2}
 .board.mirror>figure{order:1}
+
+/* ---------- annotated (one render, numbered callouts pinned to it) ---------- */
+/* the figure keeps the render's 3:2 and takes the full body height; the text column takes the rest */
+.slide.annotated>.body{display:flex;column-gap:var(--g);align-items:stretch}
+figure.annotated{aspect-ratio:3/2;width:100%}
+.slide.annotated>.body>figure.annotated{flex:none;width:auto;height:100%;max-width:calc(100% - 420px)}
+figure.annotated .pin{position:absolute;z-index:4;transform:translate(-14px,-14px);display:flex;align-items:center;gap:10px}
+.pin .n{flex:none;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;
+  background:var(--accent);color:var(--on-accent);box-shadow:0 0 0 3px rgba(255,255,255,.88);
+  font-size:var(--fs-micro);font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.pin .call{padding:4px 10px;background:rgba(16,16,14,.72);color:#fff;font-size:var(--fs-label);line-height:1.5;letter-spacing:.02em;white-space:nowrap}
+/* the lead hangs from the figure's top edge, so the column reads with the title instead of under a void */
+.slide.annotated .side{flex:1 1 0;min-width:0;max-width:600px;align-self:flex-start;border-top:1px solid var(--ink-strong);padding-top:28px}
+.slide.annotated .side .lead{color:var(--ink-strong)}
 
 /* ---------- image (full-bleed render) ---------- */
 .image{padding:0}
@@ -326,9 +347,9 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .plan .body>figure>img{object-position:left center;mix-blend-mode:multiply}
 .plan .side{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .plan .keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:24px;border-top:1px solid var(--ink-strong);padding-top:22px}
-.plan .keys b{display:block;font-size:52px;font-weight:300;line-height:1.1;color:var(--ink-strong);white-space:nowrap;font-variant-numeric:lining-nums}
-.plan .keys b small{font-size:20px;font-weight:400;margin-left:6px;color:var(--muted-text)}
-.plan .keys .label{margin-top:8px;font-size:var(--fs-micro)}
+.plan .keys>div{display:flex;flex-direction:column;min-width:0}
+.plan .keys b{display:block;font-size:44px;font-weight:300;line-height:1.1;color:var(--ink-strong);font-variant-numeric:lining-nums}
+.plan .keys .label{margin-top:auto;padding-top:10px;font-size:var(--fs-micro)}
 .plan .zones{margin-top:48px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--g)}
 .plan .zones li{display:grid;grid-template-columns:40px minmax(0,1fr);padding:14px 0 15px;border-top:1px solid var(--line)}
 .plan .zones .n{font-size:var(--fs-label);font-weight:700;color:var(--accent);line-height:30px;font-variant-numeric:tabular-nums}
@@ -336,7 +357,7 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .plan .zones .d{display:block;font-size:var(--fs-label);line-height:1.5;color:var(--muted-text)}
 .plan .note{margin-top:auto;padding-top:24px;font-size:var(--fs-micro);line-height:1.6;color:var(--muted-text)}
 
-/* ---------- detail (experience, what it says, atmosphere, note) ---------- */
+/* ---------- detail (experience moments, what it says, atmosphere) ---------- */
 .detail .body{display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:52px}
 .detail .moments{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));column-gap:var(--g)}
 .detail .m{border-top:1px solid var(--ink-strong);padding-top:18px;min-width:0}
@@ -344,7 +365,7 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .detail .m .label{margin-top:4px;font-size:var(--fs-micro)}
 .detail .m .t{margin-top:14px;font-size:20px;line-height:1.6}
 /* the lower band sits on the bottom margin, like the cards grid: air between the bands, not under them */
-.detail .lower{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,4fr) minmax(0,3fr);column-gap:var(--g);align-items:start;align-self:end;min-height:0;max-height:100%}
+.detail .lower{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,4fr);column-gap:var(--g);align-items:start;align-self:end;min-height:0;max-height:100%}
 .detail .says{position:relative;padding:32px 40px 32px 44px;background:var(--surface);min-height:0;overflow:hidden}
 .detail .says::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
 .detail .says h2{margin:12px 0 18px;font-size:var(--fs-h2);font-weight:700;line-height:1.35;color:var(--ink-strong)}
@@ -356,32 +377,25 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .detail .sw span{display:block;margin-top:8px;font-size:var(--fs-micro);line-height:1.35;color:var(--ink)}
 .detail .sw code{display:block;font-family:inherit;font-size:12px;letter-spacing:.06em;color:var(--muted-text)}
 .detail .atmos .t{font-size:var(--fs-small);line-height:1.6}
-.detail .atmos dl{margin-top:14px}
-.detail .atmos dl>div{display:grid;grid-template-columns:96px minmax(0,1fr);column-gap:12px;padding:7px 0;border-top:1px solid var(--line);font-size:var(--fs-micro);line-height:1.5}
-.detail .atmos dt{color:var(--muted-text);letter-spacing:.06em}
-.detail .note{min-height:0;overflow:hidden;border-left:3px solid var(--accent);padding:2px 0 2px 28px}
-.detail .note .q{margin-top:14px;font-size:var(--fs-body);line-height:1.6;color:var(--ink-strong)}
+.detail .rows{margin-top:14px}
+.detail .rows>div{display:grid;grid-template-columns:120px minmax(0,1fr);column-gap:16px;padding:8px 0;border-top:1px solid var(--line);font-size:var(--fs-micro);line-height:1.5}
+.detail .rows dt{color:var(--muted-text);letter-spacing:.06em}
+.detail .rows dd{color:var(--ink-strong)}
 
-/* ---------- compare (concepts x rows, recommended column highlighted) ---------- */
-.cmp{width:100%;border-collapse:collapse;table-layout:fixed}
-.cmp col.lab{width:200px}
-.cmp col.rec{background:var(--surface)}
-.cmp thead th{position:relative;text-align:left;vertical-align:bottom;padding:28px 32px 22px;border-bottom:1px solid var(--ink-strong);font-weight:400}
-.cmp thead th:first-child{padding-left:0}
-.cmp thead .letter{display:block;font-size:64px}
-.cmp thead b{display:block;margin-top:18px;font-size:28px;line-height:1.3;color:var(--ink-strong)}
-.cmp thead .alt{display:block;margin-top:4px;font-size:var(--fs-micro)}
-.cmp thead th.rec::before{content:"";position:absolute;left:0;right:0;top:0;height:6px;background:var(--accent)}
-.cmp thead th.rec::after{content:var(--rec-label);position:absolute;top:30px;right:32px;padding:6px 14px;
+/* ---------- compare (one column per concept, strengths and next steps; recommended column highlighted) ---------- */
+.compare .cols{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);column-gap:var(--g);align-items:stretch}
+.cols>.col{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;padding:36px 40px 40px;border-top:1px solid var(--ink-strong)}
+.cols>.col .letter{font-size:72px}
+.cols>.col h2{margin-top:28px;font-size:36px;font-weight:700;line-height:1.25;color:var(--ink-strong)}
+.cols>.col .label{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);font-size:var(--fs-micro)}
+.cols>.col p:not(.label){margin-top:10px;font-size:20px;line-height:1.6;color:var(--ink)}
+.cols>.col.rec{background:var(--surface);box-shadow:inset 0 6px 0 var(--accent)}
+.cols>.col.rec::before{content:var(--rec-label);position:absolute;top:36px;right:40px;z-index:4;padding:6px 14px;
   background:var(--accent);color:var(--on-accent);font-size:var(--fs-micro);font-weight:700;letter-spacing:.14em;line-height:1.5}
-.cmp tbody th{text-align:left;vertical-align:top;padding:22px 24px 22px 0;border-bottom:1px solid var(--line);
-  font-size:var(--fs-label);font-weight:400;letter-spacing:.1em;line-height:30px;color:var(--muted-text)}
-.cmp tbody td{vertical-align:top;padding:22px 32px;border-bottom:1px solid var(--line);font-size:19px;line-height:1.6;color:var(--ink)}
-.cmp tbody td.rec{color:var(--ink-strong)}
+.cols>.col.rec p:not(.label){color:var(--ink-strong)}
 
 /* ---------- flow (3–6 numbered steps, optional image) ---------- */
 .flow .body{display:flex;flex-direction:column;gap:56px}
-.flow .body:not(:has(>figure,>.placeholder)){justify-content:center;padding-bottom:40px}
 .flow .lead{max-width:1310px}
 .flow .steps{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);column-gap:var(--g);border-top:1px solid var(--line)}
 .flow .steps li{position:relative;padding-top:36px;min-width:0}
@@ -390,8 +404,13 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .flow .steps h3{margin-top:22px;font-size:28px;font-weight:700;line-height:1.35;color:var(--ink-strong)}
 .flow .steps p{margin-top:10px;font-size:19px;line-height:1.6;color:var(--muted-text)}
 .flow .body>figure,.flow .body>.placeholder{flex:1 1 auto;min-height:0}
+/* without a figure the steps turn into rows that share the body height: number, title, text on one line each */
+.flow .body:not(:has(>figure,>.placeholder)) .steps{flex:1 1 auto;min-height:0;grid-auto-flow:row;grid-auto-rows:minmax(0,1fr);border-top:0;border-bottom:1px solid var(--line)}
+.flow .body:not(:has(>figure,>.placeholder)) .steps li{display:grid;grid-template-columns:150px 420px minmax(0,1fr);column-gap:var(--g);align-items:baseline;align-content:center;padding:0;border-top:1px solid var(--line)}
+.flow .body:not(:has(>figure,>.placeholder)) .steps h3{margin:0;font-size:30px}
+.flow .body:not(:has(>figure,>.placeholder)) .steps p:not(.n){margin:0;font-size:var(--fs-body);line-height:1.55;color:var(--ink)}
 
-/* ---------- gallery (1–4 figures or placeholders with captions) ---------- */
+/* ---------- gallery (1–4 figures with captions) ---------- */
 .gallery .body{display:grid;column-gap:var(--g);row-gap:36px;align-content:center}
 .gallery .item{display:flex;flex-direction:column;min-width:0;min-height:0}
 .gallery .item>figure,.gallery .item>.placeholder{flex:1 1 auto;min-height:0}
@@ -406,14 +425,17 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .gallery.g3 .body{grid-template-columns:repeat(3,minmax(0,1fr))}
 .gallery.g2 .item>figure,.gallery.g2 .item>.placeholder,
 .gallery.g3 .item>figure,.gallery.g3 .item>.placeholder{flex:none;aspect-ratio:3/2}
-.gallery.g4 .body{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));align-content:stretch;row-gap:28px}
+.gallery.g4 .body{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));align-content:stretch;row-gap:var(--g)}
+/* 2 x 2: each cell is a small g1 (figure left, caption beside it on a rule), so a 3:2 image fills its cell */
+.gallery.g4 .item{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:var(--g);align-items:end}
+.gallery.g4 .item>figure,.gallery.g4 .item>.placeholder{height:100%}
+.gallery.g4 .cap{margin:0;padding-top:14px;border-top:1px solid var(--ink-strong)}
 
-/* ---------- table (long tables continue on the next slide, title + "（续）"/"(cont.)") ---------- */
+/* ---------- table (long tables continue on the next slide: same title + the "cont" label) ---------- */
 .tbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:var(--fs-small);line-height:1.55}
 .tbl thead th{padding:0 24px 14px 0;border-bottom:1px solid var(--ink-strong);text-align:left;vertical-align:bottom;
   font-size:var(--fs-micro);font-weight:400;letter-spacing:.14em;color:var(--muted-text)}
 .tbl td{padding:15px 24px 15px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink)}
-.tbl td.id{color:var(--muted-text);font-variant-numeric:tabular-nums;white-space:nowrap}
 .tbl td.strong{color:var(--ink-strong);font-weight:700}
 .st{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;font-size:var(--fs-label)}
 .st::before{content:"";flex:none;width:10px;height:10px;border-radius:50%;background:currentColor}
@@ -474,8 +496,6 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 html.solo body{padding:0;background:var(--paper)}
 html.solo .slide{margin:0;box-shadow:none}
 html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
-.covers-tag{position:absolute;left:var(--m);bottom:40px;z-index:5;font-size:var(--fs-micro);line-height:24px;letter-spacing:.08em;color:var(--muted)}
-.covers-tag::before{content:var(--covers-label) "  "}
 #overflow-report{max-width:1920px;margin:0 auto 40px;padding:24px;font:13px/1.5 Consolas,monospace;white-space:pre-wrap;background:#fff}
 @page{size:1920px 1080px;margin:0}
 @media print{
@@ -490,306 +510,322 @@ html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
 
 <!-- ===================================================================
      COVER · bleed – the chosen hero render fills the page
-     eyebrow ≤ 30 字 · title ≤ 18 字 · subtitle ≤ 36 字 · meta ≤ 40 字
-     Logo: div.logo-tile holding one img (deck-style.logo, e.g. ../brief/media/logo.png); omit the tile when there is no logo
+     eyebrow 30 chars · title 18 chars · subtitle 36 chars · meta 40 chars
+     Logo: div.logo-tile holding one img (deck.py new sets it from deck-style logo, or removes the tile)
      =================================================================== -->
-<section class="slide cover bleed" data-id="cover">
-  <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
-  <div class="logo-tile"><span class="logo-ph">LOGO</span></div>
+<section class="slide cover bleed" data-id="cover" data-roles="cover">
+  <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+  <div class="logo-tile"><img data-img="logo" alt=""></div>
   <div class="ct">
     <div>
-      <p class="eyebrow" data-slot="eyebrow" data-max="30">TODO: 展会名称 · 展位号</p>
-      <h1 class="ctitle" data-slot="title" data-max="18">TODO: 提案标题</h1>
-      <p class="csub" data-slot="subtitle" data-max="36">TODO: 一句话副标题</p>
+      <p class="eyebrow" data-slot="eyebrow" data-max="30">TODO: show name · stand number</p>
+      <h1 class="ctitle" data-slot="title" data-max="18">TODO: proposal title</h1>
+      <p class="csub" data-slot="subtitle" data-max="36">TODO: one-line subtitle</p>
     </div>
-    <p class="meta" data-slot="meta" data-max="40">TODO: 客户 · 面积 · 日期</p>
+    <p class="meta" data-slot="meta" data-max="40">TODO: client · area · date</p>
   </div>
 </section>
 
 <!-- ===================================================================
      COVER · split – text panel left, render bleeding right
-     eyebrow ≤ 30 · title ≤ 18 · subtitle ≤ 40 · meta ≤ 40
+     eyebrow 30 chars · title 18 chars · subtitle 40 chars · meta 40 chars
      =================================================================== -->
-<section class="slide cover split" data-id="cover-split">
+<section class="slide cover split" data-id="cover-split" data-roles="cover">
   <div class="ct">
-    <div class="logo-tile"><span class="logo-ph">LOGO</span></div>
-    <p class="eyebrow" data-slot="eyebrow" data-max="30">TODO: 展会名称 · 展位号</p>
-    <h1 class="ctitle" data-slot="title" data-max="18">TODO: 提案标题</h1>
-    <p class="csub" data-slot="subtitle" data-max="40">TODO: 一句话副标题</p>
+    <div class="logo-tile"><img data-img="logo" alt=""></div>
+    <p class="eyebrow" data-slot="eyebrow" data-max="30">TODO: show name · stand number</p>
+    <h1 class="ctitle" data-slot="title" data-max="18">TODO: proposal title</h1>
+    <p class="csub" data-slot="subtitle" data-max="40">TODO: one-line subtitle</p>
     <i class="rule-s"></i>
-    <p class="meta" data-slot="meta" data-max="40">TODO: 客户 · 面积 · 日期</p>
+    <p class="meta" data-slot="meta" data-max="40">TODO: client · area · date</p>
   </div>
-  <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+  <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
 </section>
 
 <!-- ===================================================================
-     AGENDA – up to 7 rows · item title ≤ 12 字 · description ≤ 30 字
+     AGENDA – up to 7 rows · title 8 chars · item title 12 chars · description 30 chars
+     Page numbers: span.pg with data-ref="page-id" (written by deck.py render)
      =================================================================== -->
-<section class="slide agenda" data-id="agenda">
+<section class="slide agenda" data-id="agenda" data-roles="agenda">
   <div class="ah">
-    <p class="alt" data-slot="lbl-alt">Contents</p>
-    <h1 data-slot="lbl-title">目录</h1>
+    <h1 data-slot="title" data-max="8">TODO: contents title</h1>
     <i class="rule-s"></i>
   </div>
   <ol>
-    <li><span class="n">01</span><div><h3 data-slot="i1" data-max="12">TODO</h3><p data-slot="i1-d" data-max="30">TODO</p></div><span class="pg">03</span></li>
-    <li><span class="n">02</span><div><h3 data-slot="i2" data-max="12">TODO</h3><p data-slot="i2-d" data-max="30">TODO</p></div><span class="pg">06</span></li>
-    <li><span class="n">03</span><div><h3 data-slot="i3" data-max="12">TODO</h3><p data-slot="i3-d" data-max="30">TODO</p></div><span class="pg">12</span></li>
-    <li><span class="n">04</span><div><h3 data-slot="i4" data-max="12">TODO</h3><p data-slot="i4-d" data-max="30">TODO</p></div><span class="pg">18</span></li>
-    <li><span class="n">05</span><div><h3 data-slot="i5" data-max="12">TODO</h3><p data-slot="i5-d" data-max="30">TODO</p></div><span class="pg">24</span></li>
+    <li data-repeat="item"><span class="n">01</span><div><h3 data-slot="i1" data-max="12">TODO</h3><p data-slot="i1-d" data-max="30">TODO</p></div><span class="pg" data-ref="" data-ref-style="num"></span></li>
+    <li data-repeat="item"><span class="n">02</span><div><h3 data-slot="i2" data-max="12">TODO</h3><p data-slot="i2-d" data-max="30">TODO</p></div><span class="pg" data-ref="" data-ref-style="num"></span></li>
+    <li data-repeat="item"><span class="n">03</span><div><h3 data-slot="i3" data-max="12">TODO</h3><p data-slot="i3-d" data-max="30">TODO</p></div><span class="pg" data-ref="" data-ref-style="num"></span></li>
+    <li data-repeat="item"><span class="n">04</span><div><h3 data-slot="i4" data-max="12">TODO</h3><p data-slot="i4-d" data-max="30">TODO</p></div><span class="pg" data-ref="" data-ref-style="num"></span></li>
+    <li data-repeat="item"><span class="n">05</span><div><h3 data-slot="i5" data-max="12">TODO</h3><p data-slot="i5-d" data-max="30">TODO</p></div><span class="pg" data-ref="" data-ref-style="num"></span></li>
   </ol>
 </section>
 
 <!-- ===================================================================
-     DIVIDER – section opener on --primary · number · title ≤ 12 字 · sub ≤ 40 字
+     DIVIDER – section opener on --primary · number · title 12 chars · sub 40 chars
      variant "split": add a figure.render as last child for a render on the right half
      =================================================================== -->
-<section class="slide divider" data-id="part-1">
+<section class="slide divider" data-id="divider" data-roles="divider">
   <div class="body">
-    <p class="dno" data-slot="no">01</p>
+    <p class="dno">01</p>
     <div class="dt">
-      <h1 class="dtitle" data-slot="title" data-max="12">TODO: 章节标题</h1>
-      <p class="dsub" data-slot="sub" data-max="40">TODO: 一句话说明</p>
+      <h1 class="dtitle" data-slot="title" data-max="12">TODO: section title</h1>
+      <p class="dsub" data-slot="sub" data-max="40">TODO: one sentence on the section</p>
     </div>
   </div>
 </section>
 
 <!-- ===================================================================
      STATEMENT – one big sentence (insight, idea, promise)
-     label ≤ 12 · statement ≤ 48 字 (wrap a key phrase in b for emphasis) · source ≤ 50 字
+     label 12 chars · statement 48 chars (wrap a key phrase in b for emphasis) · supporting line 50 chars
      =================================================================== -->
-<section class="slide statement" data-id="insight" data-covers="D1">
+<section class="slide statement" data-id="statement" data-roles="text">
   <div class="body">
-    <p class="tag label acc" data-slot="label" data-max="12">洞察 · Insight</p>
-    <p class="say" data-slot="statement" data-max="48">TODO: 一句洞察</p>
-    <p class="by" data-slot="by" data-max="50">TODO: 依据或出处</p>
+    <p class="tag label acc" data-slot="label" data-max="12">TODO: label</p>
+    <p class="say" data-slot="statement" data-max="48">TODO: one sentence</p>
+    <p class="by" data-slot="by" data-max="50">TODO: one supporting line</p>
   </div>
 </section>
 
 <!-- ===================================================================
-     CARDS · n3 – response cards on --surface with a thin accent bar
-     lead ≤ 60 · k ≤ 12 · title ≤ 14 · body ≤ 80 字
-     n2: title ≤ 18, body ≤ 120 · n4: title ≤ 10, body ≤ 60 · n6: title ≤ 12, body ≤ 44
+     CARDS · n3 – cards on --surface with a thin accent bar
+     lead 60 chars · k 12 chars · title 14 chars · body 80 chars
+     n2: title 18, body 120 chars · n4: title 10, body 60 chars · n6: title 12, body 44 chars
      =================================================================== -->
-<section class="slide cards n3" data-id="response-3" data-covers="D2 D3 D4">
-  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="22">TODO: 页面标题</h1></header>
+<section class="slide cards n3" data-id="cards-3" data-roles="text response">
+  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
   <div class="body">
-    <p class="lead" data-slot="lead" data-max="60">TODO: 一句导语</p>
+    <p class="lead" data-slot="lead" data-max="60">TODO: one-line lead</p>
     <div class="grid">
-      <article class="card"><p class="num">01</p><div class="txt"><p class="k" data-slot="c1-k" data-max="12">TODO</p><h3 data-slot="c1-title" data-max="14">TODO</h3><p data-slot="c1-body" data-max="80">TODO</p></div></article>
-      <article class="card"><p class="num">02</p><div class="txt"><p class="k" data-slot="c2-k" data-max="12">TODO</p><h3 data-slot="c2-title" data-max="14">TODO</h3><p data-slot="c2-body" data-max="80">TODO</p></div></article>
-      <article class="card"><p class="num">03</p><div class="txt"><p class="k" data-slot="c3-k" data-max="12">TODO</p><h3 data-slot="c3-title" data-max="14">TODO</h3><p data-slot="c3-body" data-max="80">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">01</p><div class="txt"><p class="k" data-slot="c1-k" data-max="12">TODO</p><h3 data-slot="c1-title" data-max="14">TODO</h3><p data-slot="c1-body" data-max="80">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">02</p><div class="txt"><p class="k" data-slot="c2-k" data-max="12">TODO</p><h3 data-slot="c2-title" data-max="14">TODO</h3><p data-slot="c2-body" data-max="80">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">03</p><div class="txt"><p class="k" data-slot="c3-k" data-max="12">TODO</p><h3 data-slot="c3-title" data-max="14">TODO</h3><p data-slot="c3-body" data-max="80">TODO</p></div></article>
     </div>
   </div>
 </section>
 
 <!-- CARDS · n2 -->
-<section class="slide cards n2" data-id="response-2">
-  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="22">TODO: 页面标题</h1></header>
+<section class="slide cards n2" data-id="cards-2" data-roles="text response">
+  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
   <div class="body">
-    <p class="lead" data-slot="lead" data-max="60">TODO: 一句导语</p>
+    <p class="lead" data-slot="lead" data-max="60">TODO: one-line lead</p>
     <div class="grid">
-      <article class="card"><p class="num">01</p><div class="txt"><h3 data-slot="c1-title" data-max="18">TODO</h3><p data-slot="c1-body" data-max="120">TODO</p></div></article>
-      <article class="card"><p class="num">02</p><div class="txt"><h3 data-slot="c2-title" data-max="18">TODO</h3><p data-slot="c2-body" data-max="120">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">01</p><div class="txt"><h3 data-slot="c1-title" data-max="18">TODO</h3><p data-slot="c1-body" data-max="120">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">02</p><div class="txt"><h3 data-slot="c2-title" data-max="18">TODO</h3><p data-slot="c2-body" data-max="120">TODO</p></div></article>
     </div>
   </div>
 </section>
 
 <!-- CARDS · n4 -->
-<section class="slide cards n4" data-id="response-4">
-  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="22">TODO: 页面标题</h1></header>
+<section class="slide cards n4" data-id="cards-4" data-roles="text response">
+  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
   <div class="body">
-    <p class="lead" data-slot="lead" data-max="60">TODO: 一句导语</p>
+    <p class="lead" data-slot="lead" data-max="60">TODO: one-line lead</p>
     <div class="grid">
-      <article class="card"><p class="num">01</p><div class="txt"><h3 data-slot="c1-title" data-max="10">TODO</h3><p data-slot="c1-body" data-max="60">TODO</p></div></article>
-      <article class="card"><p class="num">02</p><div class="txt"><h3 data-slot="c2-title" data-max="10">TODO</h3><p data-slot="c2-body" data-max="60">TODO</p></div></article>
-      <article class="card"><p class="num">03</p><div class="txt"><h3 data-slot="c3-title" data-max="10">TODO</h3><p data-slot="c3-body" data-max="60">TODO</p></div></article>
-      <article class="card"><p class="num">04</p><div class="txt"><h3 data-slot="c4-title" data-max="10">TODO</h3><p data-slot="c4-body" data-max="60">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">01</p><div class="txt"><h3 data-slot="c1-title" data-max="10">TODO</h3><p data-slot="c1-body" data-max="60">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">02</p><div class="txt"><h3 data-slot="c2-title" data-max="10">TODO</h3><p data-slot="c2-body" data-max="60">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">03</p><div class="txt"><h3 data-slot="c3-title" data-max="10">TODO</h3><p data-slot="c3-body" data-max="60">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="num">04</p><div class="txt"><h3 data-slot="c4-title" data-max="10">TODO</h3><p data-slot="c4-body" data-max="60">TODO</p></div></article>
     </div>
   </div>
 </section>
 
 <!-- CARDS · n6 (3 x 2) -->
-<section class="slide cards n6" data-id="response-6">
-  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="22">TODO: 页面标题</h1></header>
+<section class="slide cards n6" data-id="cards-6" data-roles="text response">
+  <header class="head"><span class="no">02</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
   <div class="body">
     <div class="grid">
-      <article class="card"><p class="k" data-slot="c1-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c1-title" data-max="12">TODO</h3><p data-slot="c1-body" data-max="44">TODO</p></div></article>
-      <article class="card"><p class="k" data-slot="c2-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c2-title" data-max="12">TODO</h3><p data-slot="c2-body" data-max="44">TODO</p></div></article>
-      <article class="card"><p class="k" data-slot="c3-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c3-title" data-max="12">TODO</h3><p data-slot="c3-body" data-max="44">TODO</p></div></article>
-      <article class="card"><p class="k" data-slot="c4-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c4-title" data-max="12">TODO</h3><p data-slot="c4-body" data-max="44">TODO</p></div></article>
-      <article class="card"><p class="k" data-slot="c5-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c5-title" data-max="12">TODO</h3><p data-slot="c5-body" data-max="44">TODO</p></div></article>
-      <article class="card"><p class="k" data-slot="c6-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c6-title" data-max="12">TODO</h3><p data-slot="c6-body" data-max="44">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="k" data-slot="c1-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c1-title" data-max="12">TODO</h3><p data-slot="c1-body" data-max="44">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="k" data-slot="c2-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c2-title" data-max="12">TODO</h3><p data-slot="c2-body" data-max="44">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="k" data-slot="c3-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c3-title" data-max="12">TODO</h3><p data-slot="c3-body" data-max="44">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="k" data-slot="c4-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c4-title" data-max="12">TODO</h3><p data-slot="c4-body" data-max="44">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="k" data-slot="c5-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c5-title" data-max="12">TODO</h3><p data-slot="c5-body" data-max="44">TODO</p></div></article>
+      <article class="card" data-repeat="card"><p class="k" data-slot="c6-k" data-max="12">TODO</p><div class="txt"><h3 data-slot="c6-title" data-max="12">TODO</h3><p data-slot="c6-body" data-max="44">TODO</p></div></article>
     </div>
   </div>
 </section>
 
 <!-- ===================================================================
-     FACTS – key–value list + image · lead ≤ 50 · key ≤ 6 字 · value ≤ 28 字 · up to 7 rows (5 with a lead)
+     FACTS – key–value list + image · lead 50 chars · key 6 chars · value 28 chars · up to 7 rows (5 with a lead)
      =================================================================== -->
-<section class="slide facts" data-id="site" data-covers="D12">
-  <header class="head"><span class="no">01</span><h1 class="title" data-slot="title" data-max="22">TODO: 页面标题</h1></header>
+<section class="slide facts" data-id="facts" data-roles="text materials">
+  <header class="head"><span class="no">01</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
   <div class="body">
     <div class="side">
-      <p class="lead" data-slot="lead" data-max="50">TODO: 一句导语</p>
+      <p class="lead" data-slot="lead" data-max="50">TODO: one-line lead</p>
       <dl class="kv">
-        <div><dt data-slot="k1" data-max="6">TODO</dt><dd data-slot="v1" data-max="28">TODO</dd></div>
-        <div><dt data-slot="k2" data-max="6">TODO</dt><dd data-slot="v2" data-max="28">TODO</dd></div>
-        <div><dt data-slot="k3" data-max="6">TODO</dt><dd data-slot="v3" data-max="28">TODO</dd></div>
-        <div><dt data-slot="k4" data-max="6">TODO</dt><dd data-slot="v4" data-max="28">TODO</dd></div>
-        <div><dt data-slot="k5" data-max="6">TODO</dt><dd data-slot="v5" data-max="28">TODO</dd></div>
+        <div data-repeat="row"><dt data-slot="k1" data-max="6">TODO</dt><dd data-slot="v1" data-max="28">TODO</dd></div>
+        <div data-repeat="row"><dt data-slot="k2" data-max="6">TODO</dt><dd data-slot="v2" data-max="28">TODO</dd></div>
+        <div data-repeat="row"><dt data-slot="k3" data-max="6">TODO</dt><dd data-slot="v3" data-max="28">TODO</dd></div>
+        <div data-repeat="row"><dt data-slot="k4" data-max="6">TODO</dt><dd data-slot="v4" data-max="28">TODO</dd></div>
+        <div data-repeat="row"><dt data-slot="k5" data-max="6">TODO</dt><dd data-slot="v5" data-max="28">TODO</dd></div>
       </dl>
     </div>
-    <figure class="pic"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1200' height='900' fill='%23e3e0d9'/%3E%3Cpath d='M0 900 1200 0' stroke='%23d3cfc6' stroke-width='2'/%3E%3Cpath d='M0 0 1200 900' stroke='%23d3cfc6' stroke-width='2'/%3E%3C/svg%3E"></figure>
+    <figure class="pic"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1200' height='900' fill='%23e3e0d9'/%3E%3Cpath d='M0 900 1200 0' stroke='%23d3cfc6' stroke-width='2'/%3E%3Cpath d='M0 0 1200 900' stroke='%23d3cfc6' stroke-width='2'/%3E%3C/svg%3E"></figure>
   </div>
 </section>
 
 <!-- ===================================================================
-     OVERVIEW – three concepts side by side; class "rec" on the recommended one
-     name ≤ 8 字 · alt (second language) ≤ 24 · manifesto ≤ 22 字 · idea ≤ 60 字
+     OVERVIEW – the selected concepts side by side; class "rec" on the recommended one
+     name 8 chars · manifesto 22 chars · idea 60 chars
      =================================================================== -->
-<section class="slide overview" data-id="overview">
-  <header class="head"><span class="no">03</span><h1 class="title" data-slot="title" data-max="22">TODO: 三个方向</h1></header>
+<section class="slide overview" data-id="overview" data-roles="overview">
+  <header class="head"><span class="no">03</span><h1 class="title" data-slot="title" data-max="22">TODO: the concepts at a glance</h1></header>
   <div class="body">
-    <article class="opt" data-concept="A">
-      <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
-      <div class="nm"><span class="letter">A</span><div><h2 data-slot="A-name" data-max="8">TODO</h2><p class="alt" data-slot="A-alt" data-max="24">TODO</p></div></div>
-      <p class="man" data-slot="A-manifesto" data-max="22">TODO</p>
-      <p class="idea" data-slot="A-idea" data-max="60">TODO</p>
+    <article class="opt" data-repeat="concept" data-concept="A">
+      <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+      <div class="nm"><span class="letter">A</span><h2 data-slot="c1-name" data-max="8">TODO</h2></div>
+      <p class="man" data-slot="c1-manifesto" data-max="22">TODO</p>
+      <p class="idea" data-slot="c1-idea" data-max="60">TODO</p>
     </article>
-    <article class="opt rec" data-concept="B">
-      <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
-      <div class="nm"><span class="letter">B</span><div><h2 data-slot="B-name" data-max="8">TODO</h2><p class="alt" data-slot="B-alt" data-max="24">TODO</p></div></div>
-      <p class="man" data-slot="B-manifesto" data-max="22">TODO</p>
-      <p class="idea" data-slot="B-idea" data-max="60">TODO</p>
+    <article class="opt rec" data-repeat="concept" data-concept="B">
+      <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+      <div class="nm"><span class="letter">B</span><h2 data-slot="c2-name" data-max="8">TODO</h2></div>
+      <p class="man" data-slot="c2-manifesto" data-max="22">TODO</p>
+      <p class="idea" data-slot="c2-idea" data-max="60">TODO</p>
     </article>
-    <article class="opt" data-concept="C">
-      <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
-      <div class="nm"><span class="letter">C</span><div><h2 data-slot="C-name" data-max="8">TODO</h2><p class="alt" data-slot="C-alt" data-max="24">TODO</p></div></div>
-      <p class="man" data-slot="C-manifesto" data-max="22">TODO</p>
-      <p class="idea" data-slot="C-idea" data-max="60">TODO</p>
+    <article class="opt" data-repeat="concept" data-concept="C">
+      <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+      <div class="nm"><span class="letter">C</span><h2 data-slot="c3-name" data-max="8">TODO</h2></div>
+      <p class="man" data-slot="c3-manifesto" data-max="22">TODO</p>
+      <p class="idea" data-slot="c3-idea" data-max="60">TODO</p>
     </article>
   </div>
 </section>
 
 <!-- ===================================================================
      BOARD · framed (default) – the benchmark concept page; full 3:2 render, uncropped
-     name ≤ 8 字 · alt ≤ 30 · manifesto ≤ 30 字 · paragraph ≤ 100 字
+     name 8 chars · manifesto 30 chars · paragraph 100 chars
      Variants: "bleed" (render bleeds top/right/bottom, cropped), "mirror" (render left, text right)
      Per-concept colour: style="--accent:#HEX" on the section
      =================================================================== -->
-<section class="slide board" data-id="A-board" data-concept="A">
+<section class="slide board" data-id="board" data-roles="board" data-concept="A">
   <div class="txt">
-    <p class="letter" data-slot="letter">A</p>
+    <p class="letter">A</p>
     <div class="names">
-      <h1 class="name" data-slot="name" data-max="8">TODO: 方案名</h1>
-      <p class="alt" data-slot="name-alt" data-max="30">TODO: Concept name</p>
+      <h1 class="name" data-slot="name" data-max="8">TODO: concept name</h1>
     </div>
     <i class="rule-s"></i>
-    <p class="man" data-slot="manifesto" data-max="30">TODO: 一句宣言</p>
-    <p class="para" data-slot="para" data-max="100">TODO: 创意说明</p>
+    <p class="man" data-slot="manifesto" data-max="30">TODO: one-line manifesto</p>
+    <p class="para" data-slot="para" data-max="100">TODO: the idea in a short paragraph</p>
   </div>
-  <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+  <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
 </section>
 
 <!-- BOARD · bleed -->
-<section class="slide board bleed" data-id="B-board" data-concept="B">
+<section class="slide board bleed" data-id="board-bleed" data-roles="board" data-concept="B">
   <div class="txt">
-    <p class="letter" data-slot="letter">B</p>
+    <p class="letter">B</p>
     <div class="names">
-      <h1 class="name" data-slot="name" data-max="8">TODO: 方案名</h1>
-      <p class="alt" data-slot="name-alt" data-max="30">TODO: Concept name</p>
+      <h1 class="name" data-slot="name" data-max="8">TODO: concept name</h1>
     </div>
     <i class="rule-s"></i>
-    <p class="man" data-slot="manifesto" data-max="30">TODO: 一句宣言</p>
-    <p class="para" data-slot="para" data-max="100">TODO: 创意说明</p>
+    <p class="man" data-slot="manifesto" data-max="30">TODO: one-line manifesto</p>
+    <p class="para" data-slot="para" data-max="100">TODO: the idea in a short paragraph</p>
   </div>
-  <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+  <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
 </section>
 
 <!-- BOARD · mirror -->
-<section class="slide board mirror" data-id="C-board" data-concept="C">
+<section class="slide board mirror" data-id="board-mirror" data-roles="board" data-concept="C">
   <div class="txt">
-    <p class="letter" data-slot="letter">C</p>
+    <p class="letter">C</p>
     <div class="names">
-      <h1 class="name" data-slot="name" data-max="8">TODO: 方案名</h1>
-      <p class="alt" data-slot="name-alt" data-max="30">TODO: Concept name</p>
+      <h1 class="name" data-slot="name" data-max="8">TODO: concept name</h1>
     </div>
     <i class="rule-s"></i>
-    <p class="man" data-slot="manifesto" data-max="30">TODO: 一句宣言</p>
-    <p class="para" data-slot="para" data-max="100">TODO: 创意说明</p>
+    <p class="man" data-slot="manifesto" data-max="30">TODO: one-line manifesto</p>
+    <p class="para" data-slot="para" data-max="100">TODO: the idea in a short paragraph</p>
   </div>
-  <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+  <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
 </section>
 
 <!-- ===================================================================
-     IMAGE – full-bleed render · caption ≤ 30 字 (concept letter · name · view)
+     IMAGE – full-bleed render · caption 30 chars (concept letter · name · view)
      =================================================================== -->
-<section class="slide image" data-id="A-hero" data-concept="A">
-  <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
-  <p class="cap" data-slot="caption" data-max="30">TODO: A · 方案名 · 主视角</p>
+<section class="slide image" data-id="image" data-roles="board" data-concept="A">
+  <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+  <p class="cap" data-slot="caption" data-max="30">TODO: letter · concept name · view</p>
 </section>
 
 <!-- ===================================================================
      STAGE – render contained on a dark page, caption column right
-     name ≤ 10 字 · view label ≤ 16 · caption ≤ 70 字
+     name 10 chars · view label 16 chars · caption 70 chars
      =================================================================== -->
-<section class="slide stage" data-id="A-front" data-concept="A">
-  <figure class="render"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
+<section class="slide stage" data-id="stage" data-roles="board" data-concept="A">
+  <figure class="render"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E"></figure>
   <div class="side">
-    <p class="letter" data-slot="letter">A</p>
-    <h2 data-slot="name" data-max="10">TODO: 方案名</h2>
-    <p class="label" data-slot="view" data-max="16">TODO: 正立面 · Front view</p>
+    <p class="letter">A</p>
+    <h2 data-slot="name" data-max="10">TODO: concept name</h2>
+    <p class="label" data-slot="view" data-max="16">TODO: view</p>
     <i class="rule-s"></i>
-    <p class="t" data-slot="caption" data-max="70">TODO: 这张图在看什么</p>
+    <p class="t" data-slot="caption" data-max="70">TODO: what this view shows</p>
   </div>
 </section>
 
 <!-- ===================================================================
      PLAN – plan drawing + three key facts + numbered zones (up to 8) + note
-     key value ≤ 6 · zone name ≤ 8 字 · zone note ≤ 16 字 · note ≤ 60 字
+     key value 10 chars (number and unit) · zone name 8 chars · zone note 16 chars · note 60 chars
+     The key labels come from the labels file (data-auto).
      =================================================================== -->
-<section class="slide plan" data-id="A-plan" data-concept="A">
-  <header class="head"><span class="no">A</span><h1 class="title" data-slot="title" data-max="22">TODO: 方案名 · 平面布局</h1></header>
+<section class="slide plan" data-id="plan" data-roles="plan" data-concept="A">
+  <header class="head"><span class="no">A</span><h1 class="title" data-slot="title" data-max="22">TODO: concept name · plan</h1></header>
   <div class="body">
-    <figure class="pic contain"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1400 1000'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure>
+    <figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure>
     <div class="side">
       <div class="keys">
-        <div><b data-slot="key1">TODO<small>m²</small></b><p class="label" data-slot="lbl-key1">面积</p></div>
-        <div><b data-slot="key2">TODO<small>m</small></b><p class="label" data-slot="lbl-key2">长 × 宽</p></div>
-        <div><b data-slot="key3">TODO<small>m</small></b><p class="label" data-slot="lbl-key3">最高点</p></div>
+        <div><b data-slot="key1" data-max="10">TODO</b><p class="label" data-auto="chrome.size"></p></div>
+        <div><b data-slot="key2" data-max="10">TODO</b><p class="label" data-auto="chrome.highest_point"></p></div>
+        <div><b data-slot="key3" data-max="10">TODO</b><p class="label" data-auto="chrome.open_sides"></p></div>
       </div>
       <ol class="zones">
-        <li><span class="n">01</span><div><b data-slot="z1" data-max="8">TODO</b><span class="d" data-slot="z1-d" data-max="16">TODO</span></div></li>
-        <li><span class="n">02</span><div><b data-slot="z2" data-max="8">TODO</b><span class="d" data-slot="z2-d" data-max="16">TODO</span></div></li>
-        <li><span class="n">03</span><div><b data-slot="z3" data-max="8">TODO</b><span class="d" data-slot="z3-d" data-max="16">TODO</span></div></li>
-        <li><span class="n">04</span><div><b data-slot="z4" data-max="8">TODO</b><span class="d" data-slot="z4-d" data-max="16">TODO</span></div></li>
-        <li><span class="n">05</span><div><b data-slot="z5" data-max="8">TODO</b><span class="d" data-slot="z5-d" data-max="16">TODO</span></div></li>
-        <li><span class="n">06</span><div><b data-slot="z6" data-max="8">TODO</b><span class="d" data-slot="z6-d" data-max="16">TODO</span></div></li>
+        <li data-repeat="zone"><span class="n">01</span><div><b data-slot="z1" data-max="8">TODO</b><span class="d" data-slot="z1-d" data-max="16">TODO</span></div></li>
+        <li data-repeat="zone"><span class="n">02</span><div><b data-slot="z2" data-max="8">TODO</b><span class="d" data-slot="z2-d" data-max="16">TODO</span></div></li>
+        <li data-repeat="zone"><span class="n">03</span><div><b data-slot="z3" data-max="8">TODO</b><span class="d" data-slot="z3-d" data-max="16">TODO</span></div></li>
+        <li data-repeat="zone"><span class="n">04</span><div><b data-slot="z4" data-max="8">TODO</b><span class="d" data-slot="z4-d" data-max="16">TODO</span></div></li>
+        <li data-repeat="zone"><span class="n">05</span><div><b data-slot="z5" data-max="8">TODO</b><span class="d" data-slot="z5-d" data-max="16">TODO</span></div></li>
+        <li data-repeat="zone"><span class="n">06</span><div><b data-slot="z6" data-max="8">TODO</b><span class="d" data-slot="z6-d" data-max="16">TODO</span></div></li>
       </ol>
-      <p class="note" data-slot="note" data-max="60">TODO: 尺寸以几何规格与平面图为准</p>
+      <p class="note" data-slot="foot" data-max="60">TODO: dimensions follow the geometry and the plan</p>
     </div>
   </div>
 </section>
 
 <!-- ===================================================================
-     DETAIL – four experience moments · what it says · atmosphere · director's note
-     moment ≤ 40 字 · headline ≤ 16 字 · message ≤ 22 字 · atmosphere ≤ 44 字 · kv value ≤ 14 字 · note ≤ 60 字
+     ANNOTATED – one render with numbered callouts; data-x / data-y = the pin's point in percent of the figure
+     title 22 chars · callout 16 chars · lead 80 chars. The same figure.render.annotated may sit on a
+     materials or interaction page.
+     =================================================================== -->
+<section class="slide annotated" data-id="annotated" data-roles="annotated" data-concept="A">
+  <header class="head"><span class="no">A</span><h1 class="title" data-slot="title" data-max="22">TODO: what the stand does, point by point</h1></header>
+  <div class="body">
+    <figure class="render annotated"><img data-img="render" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1536 1024' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1536' height='1024' fill='%23cfccc4'/%3E%3Crect y='610' width='1536' height='414' fill='%23c3bfb6'/%3E%3Cpath d='M250 840 400 690H1136L1286 840Z' fill='%23b5b0a6'/%3E%3Cpath d='M470 690V300H1066V690Z' fill='%23a8a398'/%3E%3Cpath d='M560 690V380H700V690Z' fill='%23bdb8ad'/%3E%3C/svg%3E">
+      <div class="pin" data-repeat="pin" data-x="28" data-y="58"><b class="n">01</b><span class="call" data-slot="p1" data-max="16">TODO</span></div>
+      <div class="pin" data-repeat="pin" data-x="55" data-y="38"><b class="n">02</b><span class="call" data-slot="p2" data-max="16">TODO</span></div>
+      <div class="pin" data-repeat="pin" data-x="70" data-y="66"><b class="n">03</b><span class="call" data-slot="p3" data-max="16">TODO</span></div>
+    </figure>
+    <div class="side"><p class="lead" data-slot="lead" data-max="80">TODO: one sentence on how the points work together</p></div>
+  </div>
+</section>
+
+<!-- ===================================================================
+     DETAIL – four experience moments · what it says · atmosphere
+     moment: at 6 chars, label 8 chars, text 40 chars · labels 8 chars · headline 16 chars · message 22 chars
+     swatch name 6 chars · atmosphere 44 chars · row key 6 chars, value 14 chars
      Swatch colour: the i element carries style="--c:#HEX"
      =================================================================== -->
-<section class="slide detail" data-id="A-detail" data-concept="A">
-  <header class="head"><span class="no">A</span><h1 class="title" data-slot="title" data-max="22">TODO: 方案名 · 体验与表达</h1></header>
+<section class="slide detail" data-id="detail" data-roles="text" data-concept="A">
+  <header class="head"><span class="no">A</span><h1 class="title" data-slot="title" data-max="22">TODO: concept name · experience</h1></header>
   <div class="body">
     <div class="moments">
-      <div class="m"><p class="at" data-slot="lbl-m1">10 m</p><p class="label" data-slot="lbl-m1b">远观 · 被吸引</p><p class="t" data-slot="m1" data-max="40">TODO</p></div>
-      <div class="m"><p class="at" data-slot="lbl-m2">3 m</p><p class="label" data-slot="lbl-m2b">走近 · 被邀请</p><p class="t" data-slot="m2" data-max="40">TODO</p></div>
-      <div class="m"><p class="at" data-slot="lbl-m3">0 m</p><p class="label" data-slot="lbl-m3b">走进 · 发现与交流</p><p class="t" data-slot="m3" data-max="40">TODO</p></div>
-      <div class="m"><p class="at" data-slot="lbl-m4">拍照点</p><p class="label" data-slot="lbl-m4b">带走的画面</p><p class="t" data-slot="m4" data-max="40">TODO</p></div>
+      <div class="m"><p class="at" data-slot="m1-at" data-max="6">TODO</p><p class="label" data-slot="m1-k" data-max="8">TODO: label</p><p class="t" data-slot="m1" data-max="40">TODO</p></div>
+      <div class="m"><p class="at" data-slot="m2-at" data-max="6">TODO</p><p class="label" data-slot="m2-k" data-max="8">TODO: label</p><p class="t" data-slot="m2" data-max="40">TODO</p></div>
+      <div class="m"><p class="at" data-slot="m3-at" data-max="6">TODO</p><p class="label" data-slot="m3-k" data-max="8">TODO: label</p><p class="t" data-slot="m3" data-max="40">TODO</p></div>
+      <div class="m"><p class="at" data-slot="m4-at" data-max="6">TODO</p><p class="label" data-slot="m4-k" data-max="8">TODO: label</p><p class="t" data-slot="m4" data-max="40">TODO</p></div>
     </div>
     <div class="lower">
       <div class="says">
-        <p class="label acc" data-slot="lbl-says">它说什么</p>
-        <h2 data-slot="headline" data-max="16">TODO: 主标题</h2>
+        <p class="label acc" data-slot="says-k" data-max="8">TODO: label</p>
+        <h2 data-slot="headline" data-max="16">TODO: headline</h2>
         <ol>
           <li><span class="n">01</span><span data-slot="msg1" data-max="22">TODO</span></li>
           <li><span class="n">02</span><span data-slot="msg2" data-max="22">TODO</span></li>
@@ -797,95 +833,118 @@ html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
         </ol>
       </div>
       <div class="atmos">
-        <p class="label acc" data-slot="lbl-atmos">氛围</p>
+        <p class="label acc" data-slot="atmos-k" data-max="8">TODO: label</p>
         <div class="sw">
           <div><i style="--c:#22313B"></i><span data-slot="sw1" data-max="6">TODO</span><code>#22313B</code></div>
           <div><i style="--c:#A8743F"></i><span data-slot="sw2" data-max="6">TODO</span><code>#A8743F</code></div>
           <div><i style="--c:#E6E4DD"></i><span data-slot="sw3" data-max="6">TODO</span><code>#E6E4DD</code></div>
           <div><i style="--c:#FAFAF7"></i><span data-slot="sw4" data-max="6">TODO</span><code>#FAFAF7</code></div>
         </div>
-        <p class="t" data-slot="atmos" data-max="44">TODO: 材料、色彩与光</p>
-        <dl>
-          <div><dt data-slot="lbl-sig">标志细节</dt><dd data-slot="sig" data-max="14">TODO</dd></div>
-          <div><dt data-slot="lbl-sys">配套系统</dt><dd data-slot="sys" data-max="14">TODO</dd></div>
-          <div><dt data-slot="lbl-int">强度</dt><dd data-slot="int" data-max="14">TODO</dd></div>
+        <p class="t" data-slot="atmos" data-max="44">TODO: materials, colour and light</p>
+        <dl class="rows">
+          <div data-repeat="row"><dt data-slot="row1-k" data-max="6">TODO</dt><dd data-slot="row1-v" data-max="14">TODO</dd></div>
+          <div data-repeat="row"><dt data-slot="row2-k" data-max="6">TODO</dt><dd data-slot="row2-v" data-max="14">TODO</dd></div>
         </dl>
       </div>
-      <blockquote class="note">
-        <p class="label acc" data-slot="lbl-note">创意总监点评</p>
-        <p class="q" data-slot="note" data-max="60">TODO: 优势与风险，一句话</p>
-      </blockquote>
     </div>
   </div>
 </section>
 
 <!-- ===================================================================
-     COMPARE – three concepts x 5 rows; class "rec" on the recommended col, th and td cells
-     name ≤ 8 字 · alt ≤ 24 · row label ≤ 6 字 · cell ≤ 36 字
+     COMPARE – one column per concept; class "rec" on the recommended column
+     name 8 chars · labels 8 chars · why 60 chars (strengths only) · next 60 chars (how it develops, never a risk)
      =================================================================== -->
-<section class="slide compare" data-id="compare">
-  <header class="head"><span class="no">04</span><h1 class="title" data-slot="title" data-max="22">TODO: 三个方向对比</h1></header>
+<section class="slide compare" data-id="compare" data-roles="compare">
+  <header class="head"><span class="no">04</span><h1 class="title" data-slot="title" data-max="22">TODO: the concepts compared</h1></header>
   <div class="body">
-    <table class="cmp">
-      <colgroup><col class="lab"><col><col class="rec"><col></colgroup>
-      <thead><tr>
-        <th></th>
-        <th><span class="letter">A</span><b data-slot="A-name" data-max="8">TODO</b><span class="alt" data-slot="A-alt" data-max="24">TODO</span></th>
-        <th class="rec"><span class="letter">B</span><b data-slot="B-name" data-max="8">TODO</b><span class="alt" data-slot="B-alt" data-max="24">TODO</span></th>
-        <th><span class="letter">C</span><b data-slot="C-name" data-max="8">TODO</b><span class="alt" data-slot="C-alt" data-max="24">TODO</span></th>
-      </tr></thead>
-      <tbody>
-        <tr><th data-slot="lbl-r1">创意</th><td data-slot="A-r1" data-max="36">TODO</td><td class="rec" data-slot="B-r1" data-max="36">TODO</td><td data-slot="C-r1" data-max="36">TODO</td></tr>
-        <tr><th data-slot="lbl-r2">感受</th><td data-slot="A-r2" data-max="36">TODO</td><td class="rec" data-slot="B-r2" data-max="36">TODO</td><td data-slot="C-r2" data-max="36">TODO</td></tr>
-        <tr><th data-slot="lbl-r3">出发点</th><td data-slot="A-r3" data-max="36">TODO</td><td class="rec" data-slot="B-r3" data-max="36">TODO</td><td data-slot="C-r3" data-max="36">TODO</td></tr>
-        <tr><th data-slot="lbl-r4">适合的客户</th><td data-slot="A-r4" data-max="36">TODO</td><td class="rec" data-slot="B-r4" data-max="36">TODO</td><td data-slot="C-r4" data-max="36">TODO</td></tr>
-        <tr><th data-slot="lbl-r5">主要风险</th><td data-slot="A-r5" data-max="36">TODO</td><td class="rec" data-slot="B-r5" data-max="36">TODO</td><td data-slot="C-r5" data-max="36">TODO</td></tr>
-      </tbody>
-    </table>
+    <div class="cols">
+      <article class="col" data-repeat="concept" data-concept="A"><span class="letter">A</span><h2 data-slot="c1-name" data-max="8">TODO</h2><p class="label acc" data-slot="c1-why-k" data-max="8">TODO: label</p><p data-slot="c1-why" data-max="60">TODO: why choose it, strengths only</p><p class="label" data-slot="c1-next-k" data-max="8">TODO: label</p><p data-slot="c1-next" data-max="60">TODO: how it develops next, never a risk</p></article>
+      <article class="col rec" data-repeat="concept" data-concept="B"><span class="letter">B</span><h2 data-slot="c2-name" data-max="8">TODO</h2><p class="label acc" data-slot="c2-why-k" data-max="8">TODO: label</p><p data-slot="c2-why" data-max="60">TODO: why choose it, strengths only</p><p class="label" data-slot="c2-next-k" data-max="8">TODO: label</p><p data-slot="c2-next" data-max="60">TODO: how it develops next, never a risk</p></article>
+      <article class="col" data-repeat="concept" data-concept="C"><span class="letter">C</span><h2 data-slot="c3-name" data-max="8">TODO</h2><p class="label acc" data-slot="c3-why-k" data-max="8">TODO: label</p><p data-slot="c3-why" data-max="60">TODO: why choose it, strengths only</p><p class="label" data-slot="c3-next-k" data-max="8">TODO: label</p><p data-slot="c3-next" data-max="60">TODO: how it develops next, never a risk</p></article>
+    </div>
   </div>
 </section>
 
 <!-- ===================================================================
-     FLOW – 3–6 numbered steps; optional figure (or div.placeholder) after the steps
-     lead ≤ 60 · step title ≤ 10 字 · step body ≤ 44 字 (≤ 30 with 6 steps)
+     FLOW – 3–6 numbered steps; optional figure after the steps (delete it when not needed:
+     without a figure the steps become full-width rows that share the page height)
+     lead 60 chars · step title 10 chars · step body 44 chars (30 with 6 steps)
      =================================================================== -->
-<section class="slide flow" data-id="journey" data-covers="D6">
-  <header class="head"><span class="no">05</span><h1 class="title" data-slot="title" data-max="22">TODO: 参观动线</h1></header>
+<section class="slide flow" data-id="flow" data-roles="interaction text">
+  <header class="head"><span class="no">05</span><h1 class="title" data-slot="title" data-max="22">TODO: visitor journey</h1></header>
   <div class="body">
     <ol class="steps">
-      <li><p class="n">01</p><h3 data-slot="s1" data-max="10">TODO</h3><p data-slot="s1-d" data-max="44">TODO</p></li>
-      <li><p class="n">02</p><h3 data-slot="s2" data-max="10">TODO</h3><p data-slot="s2-d" data-max="44">TODO</p></li>
-      <li><p class="n">03</p><h3 data-slot="s3" data-max="10">TODO</h3><p data-slot="s3-d" data-max="44">TODO</p></li>
-      <li><p class="n">04</p><h3 data-slot="s4" data-max="10">TODO</h3><p data-slot="s4-d" data-max="44">TODO</p></li>
+      <li data-repeat="step"><p class="n">01</p><h3 data-slot="s1" data-max="10">TODO</h3><p data-slot="s1-d" data-max="44">TODO</p></li>
+      <li data-repeat="step"><p class="n">02</p><h3 data-slot="s2" data-max="10">TODO</h3><p data-slot="s2-d" data-max="44">TODO</p></li>
+      <li data-repeat="step"><p class="n">03</p><h3 data-slot="s3" data-max="10">TODO</h3><p data-slot="s3-d" data-max="44">TODO</p></li>
+      <li data-repeat="step"><p class="n">04</p><h3 data-slot="s4" data-max="10">TODO</h3><p data-slot="s4-d" data-max="44">TODO</p></li>
     </ol>
-    <figure class="pic"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1200' height='900' fill='%23e3e0d9'/%3E%3Cpath d='M0 900 1200 0' stroke='%23d3cfc6' stroke-width='2'/%3E%3Cpath d='M0 0 1200 900' stroke='%23d3cfc6' stroke-width='2'/%3E%3C/svg%3E"></figure>
+    <figure class="pic"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1200' height='900' fill='%23e3e0d9'/%3E%3Cpath d='M0 900 1200 0' stroke='%23d3cfc6' stroke-width='2'/%3E%3Cpath d='M0 0 1200 900' stroke='%23d3cfc6' stroke-width='2'/%3E%3C/svg%3E"></figure>
   </div>
 </section>
 
 <!-- ===================================================================
-     GALLERY – g1 / g2 / g3 / g4; each .item = figure (render or pic) or .placeholder + caption
-     caption ≤ 30 字 (g1: ≤ 80 字)
+     GALLERY · g1 / g2 / g3 / g4 – each .item = figure (pic.contain for plans and drawings) + caption
+     caption 30 chars (g1: 80 chars); no file names, no check results
+     g1 and g4 set the caption beside the figure on a rule; g2 and g3 set it under the figure
      =================================================================== -->
+<section class="slide gallery g1" data-id="gallery-1" data-roles="text plan">
+  <header class="head"><span class="no">04</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
+  <div class="body">
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap1" data-max="80">TODO</p></div>
+  </div>
+</section>
+
+<!-- GALLERY · g2 -->
+<section class="slide gallery g2" data-id="gallery-2" data-roles="text plan">
+  <header class="head"><span class="no">04</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
+  <div class="body">
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap1" data-max="30">TODO</p></div>
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap2" data-max="30">TODO</p></div>
+  </div>
+</section>
+
+<!-- GALLERY · g3 -->
+<section class="slide gallery g3" data-id="gallery-3" data-roles="text plan">
+  <header class="head"><span class="no">05</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
+  <div class="body">
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap1" data-max="30">TODO</p></div>
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap2" data-max="30">TODO</p></div>
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap3" data-max="30">TODO</p></div>
+  </div>
+</section>
+
+<!-- GALLERY · g4 (2 x 2) -->
+<section class="slide gallery g4" data-id="gallery-4" data-roles="text plan">
+  <header class="head"><span class="no">05</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
+  <div class="body">
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap1" data-max="30">TODO</p></div>
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap2" data-max="30">TODO</p></div>
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap3" data-max="30">TODO</p></div>
+    <div class="item" data-repeat="item"><figure class="pic contain"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='150 150 1100 700'%3E%3Cg fill='none' stroke='%23d6d3ca' stroke-width='1'%3E%3Cpath d='M200 200v600M300 200v600M400 200v600M500 200v600M600 200v600M700 200v600M800 200v600M900 200v600M1000 200v600M1100 200v600M1200 200v600M200 300h1000M200 400h1000M200 500h1000M200 600h1000M200 700h1000'/%3E%3C/g%3E%3Cpath d='M200 800V200H1200' fill='none' stroke='%2326251f' stroke-width='12'/%3E%3Cpath d='M1200 200V800H200' fill='none' stroke='%23a19d93' stroke-width='3' stroke-dasharray='14 10'/%3E%3Crect x='220' y='220' width='260' height='160' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Crect x='620' y='440' width='420' height='90' fill='%23e6e4dd' stroke='%2326251f' stroke-width='2'/%3E%3Ccircle cx='380' cy='620' r='80' fill='none' stroke='%2326251f' stroke-width='2'/%3E%3C/svg%3E"></figure><p class="cap" data-slot="cap4" data-max="30">TODO</p></div>
+  </div>
+</section>
 
 <!-- ===================================================================
-     TABLE – appendix tables; ≤ 9 rows of up to 2 lines per slide, continue on the next slide
-     with the same title + "（续）" / " (cont.)". Status: span.st with class met, part or not
-     Column widths via colgroup/col style="width:N%"
+     TABLE – response and sign-off tables; up to 9 rows of up to 2 lines per slide, continue on the next
+     slide with the same title + the "cont" label. No IDs and no citations in any cell.
+     Column widths via colgroup/col style="width:N%" · cells 40 / 60 / 24 chars · note 80 chars
+     A claim awaiting sign-off: data-claim="Cn" on its cell
      =================================================================== -->
-<section class="slide table" data-id="compliance-A">
-  <header class="head"><span class="no">A</span><h1 class="title" data-slot="title" data-max="26">TODO: 方案 A · 对标书要求的回应</h1></header>
+<section class="slide table" data-id="table" data-roles="response signoff">
+  <header class="head"><span class="no">05</span><h1 class="title" data-slot="title" data-max="26">TODO: page title</h1></header>
   <div class="body">
     <table class="tbl">
-      <colgroup><col style="width:7%"><col style="width:30%"><col><col style="width:12%"></colgroup>
-      <thead><tr><th data-slot="lbl-c1">编号</th><th data-slot="lbl-c2">要求</th><th data-slot="lbl-c3">本方案如何满足</th><th data-slot="lbl-c4">状态</th></tr></thead>
+      <colgroup><col style="width:32%"><col><col style="width:22%"></colgroup>
+      <thead><tr><th data-slot="col1">TODO</th><th data-slot="col2">TODO</th><th data-slot="col3">TODO</th></tr></thead>
       <tbody>
-        <tr><td class="id">R1</td><td data-slot="r1-a" data-max="40">TODO</td><td data-slot="r1-b" data-max="60">TODO</td><td><span class="st met">满足</span></td></tr>
-        <tr><td class="id">R2</td><td data-slot="r2-a" data-max="40">TODO</td><td data-slot="r2-b" data-max="60">TODO</td><td><span class="st met">满足</span></td></tr>
-        <tr><td class="id">R3</td><td data-slot="r3-a" data-max="40">TODO</td><td data-slot="r3-b" data-max="60">TODO</td><td><span class="st part">部分满足</span></td></tr>
-        <tr><td class="id">R4</td><td data-slot="r4-a" data-max="40">TODO</td><td data-slot="r4-b" data-max="60">TODO</td><td><span class="st not">未满足</span></td></tr>
+        <tr data-repeat="row"><td data-slot="r1-a" data-max="40">TODO</td><td data-slot="r1-b" data-max="60">TODO</td><td data-slot="r1-c" data-max="24">TODO</td></tr>
+        <tr data-repeat="row"><td data-slot="r2-a" data-max="40">TODO</td><td data-slot="r2-b" data-max="60">TODO</td><td data-slot="r2-c" data-max="24">TODO</td></tr>
+        <tr data-repeat="row"><td data-slot="r3-a" data-max="40">TODO</td><td data-slot="r3-b" data-max="60">TODO</td><td data-slot="r3-c" data-max="24">TODO</td></tr>
+        <tr data-repeat="row"><td data-slot="r4-a" data-max="40">TODO</td><td data-slot="r4-b" data-max="60">TODO</td><td data-slot="r4-c" data-max="24">TODO</td></tr>
       </tbody>
     </table>
-    <p class="foot" data-slot="foot" data-max="80">TODO: 部分满足与未满足项的原因与补救</p>
+    <p class="foot" data-slot="foot" data-max="80">TODO: a note under the table</p>
   </div>
 </section>
 
@@ -894,10 +953,10 @@ html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
      Text: .t-display .t-cover .t-title .t-h2 .t-h3 .t-lead .t-body .t-small .t-label .t-micro
      Colour: .c-* and .bg-* (token colours only) · .bar (accent bar) · .topline · .stack · .pad
      =================================================================== -->
-<section class="slide free" data-id="free">
-  <header class="head"><span class="no">06</span><h1 class="title" data-slot="title" data-max="22">TODO: 自由版式</h1></header>
+<section class="slide free" data-id="free" data-roles="text">
+  <header class="head"><span class="no">06</span><h1 class="title" data-slot="title" data-max="22">TODO: page title</h1></header>
   <div class="body">
-    <figure class="pic col-1 span-7 row-1 rows-6"><img alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1200' height='900' fill='%23e3e0d9'/%3E%3Cpath d='M0 900 1200 0' stroke='%23d3cfc6' stroke-width='2'/%3E%3Cpath d='M0 0 1200 900' stroke='%23d3cfc6' stroke-width='2'/%3E%3C/svg%3E"></figure>
+    <figure class="pic col-1 span-7 row-1 rows-6"><img data-img="plan" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1200' height='900' fill='%23e3e0d9'/%3E%3Cpath d='M0 900 1200 0' stroke='%23d3cfc6' stroke-width='2'/%3E%3Cpath d='M0 0 1200 900' stroke='%23d3cfc6' stroke-width='2'/%3E%3C/svg%3E"></figure>
     <div class="col-8 span-5 row-1 rows-3 stack topline">
       <p class="t-label c-accent t-bold" data-slot="k" data-max="12">TODO</p>
       <p class="t-h2 c-strong mt-2" data-slot="h" data-max="20">TODO</p>
@@ -922,12 +981,11 @@ html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
     Array.prototype.forEach.call(s.querySelectorAll('[data-slot]'), function (el) {
       if (/^\s*TODO\b/.test(el.textContent)) el.classList.add('is-todo');
     });
-    if (doc.hasAttribute('data-show-covers') && s.getAttribute('data-covers')) {
-      var t = document.createElement('span');
-      t.className = 'covers-tag';
-      t.textContent = s.getAttribute('data-covers').trim().split(/\s+/).join(' · ');
-      s.appendChild(t);
-    }
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('figure.annotated .pin[data-x][data-y]'), function (p) {
+    p.style.left = parseFloat(p.getAttribute('data-x')) + '%';
+    p.style.top = parseFloat(p.getAttribute('data-y')) + '%';
   });
 
   if (solo >= 1 && solo <= slides.length) {

@@ -269,6 +269,185 @@ def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaf
     return root
 
 
+# ---------- deck fixture (phase 3): a project with two selected concepts and a filled deck ----------
+
+DECK_SELECTED = ("set-2/B", "set-1/A")         # display letters A and B; lead set-1/A
+DECK_LEAD = "set-1/A"
+_FILLER = "Open timber lounge for visitors to rest and talk"
+_DECK_CACHE: dict[str, str] = {}               # lang -> a built project folder, copied for each test
+
+
+def _geometry(title: str, arch: str, bar: str) -> dict:
+    return {
+        "title": title, "width": 8, "depth": 6, "max_height": 4.5, "unit": "m", "open_sides": ["front", "right"],
+        "elements": [
+            {"id": "X1", "shape": "extrusion", "label": arch, "kind": "hero", "x": 0, "y": 2, "w": 3, "h": 0.2,
+             "profile": [[0, 0], [1.5, 4.2], [3, 0]], "support": "floor"},
+            {"id": "T1", "label": bar, "x": 4, "y": 1, "w": 2, "h": 0.8, "height": 1.1},
+            {"id": "T2", "label": bar, "x": 4, "y": 3, "w": 2, "h": 0.8, "height": 1.1}]}
+
+
+def fill(fragment: str, texts: dict | None = None, imgs=(), attrs: dict | None = None) -> str:
+    """Fill a deck.py layouts --emit fragment (or one slide of a deck).
+
+    texts: {slot name: HTML} for the leaf slots; every other leaf slot gets a neutral phrase cut to its data-max.
+    imgs: src values for the img elements in document order (fewer than the imgs leaves the rest as they are).
+    attrs: attributes set on the section, e.g. {"data-id": "a-board", "data-concept": "A", "data-covers": "D1"};
+    a data-concept also sets the single capital letter of .no and .letter elements."""
+    import deck_html as h
+    sec = h.element(fragment)
+    for name, value in (attrs or {}).items():
+        sec.set(name, value)
+    texts = texts or {}
+    for slot in h.leaf_slots(sec):
+        name = slot.get("data-slot")
+        if name in texts:
+            slot.set_inner(h.fragment(texts[name]))
+            continue
+        cap = slot.get("data-max")
+        limit = min(int(cap) if cap and cap.isdigit() else 40, 40)
+        out = ""
+        for w in _FILLER.split():
+            if len((out + " " + w).strip()) > limit:
+                break
+            out = (out + " " + w).strip()
+        slot.set_text(out or _FILLER[:max(1, limit)])
+    srcs = list(imgs)
+    for img in [n for n in sec.iter() if n.tag == "img"][:len(srcs)]:
+        img.set("src", srcs.pop(0))
+    letter = sec.get("data-concept")
+    if letter:
+        for n in sec.iter():
+            if (n.has_class("no") or n.has_class("letter")) and not any(c.is_el for c in n.children) \
+                    and len(n.text().strip()) == 1 and n.text().strip().isalpha():
+                n.set_text(letter)
+    return sec.html() + "\n"
+
+
+def _emit(root, spec: str, count: int | None = None) -> str:
+    import deck
+    argv = ["layouts", "--emit", spec, "--project", str(root)]
+    if count is not None:
+        argv[3:3] = ["--count", str(count)]
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = deck.main(argv)
+    assert code == 0, f"deck.py layouts --emit {spec} failed"
+    return out.getvalue()
+
+
+def _build_deck_project(root: Path, lang: str) -> None:
+    import deck
+    import deck_html as h
+    import draw_plan
+    build_project(root, lang=lang, style={"logo": "brand/logo.png"})
+    brief = common.read_json(str(root / "brief" / "brief.json"))
+    brief["protected_terms"].append("Tidewater C1")
+    common.write_json(str(root / "brief" / "brief.json"), brief)
+    _write(root / "input" / "tender-brief.docx", b"PK fictional tender document")
+    for key in ("set-1/A", "set-1/B", "set-2/A", "set-2/B"):
+        review_pass(root, f"concepts/{key}/renders/hero-v2.png")
+    assert gates.main(["select", *DECK_SELECTED, "--lead", DECK_LEAD, "--project", str(root)]) == 0
+    specs = {"set-2/B": _geometry("A · Canopy Lounge", "Canopy arch", "Coffee bar"),
+             "set-1/A": _geometry("B · Tidal Gate", "Boarding arch", "Info counter")}
+    for key, spec in specs.items():
+        folder = root / "concepts" / key
+        common.write_json(str(folder / "geometry.json"), spec)
+        assert draw_plan.main(["plan", str(folder / "geometry.json"), str(folder / "plan"),
+                               "--project", str(root)]) == 0
+
+    def render_of(key):
+        return f"../concepts/{key}/renders/hero-v2.png"
+
+    def plan_of(key):
+        return f"../concepts/{key}/plan.png"
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        assert deck.main(["new", "--project", str(root)]) == 0
+    a, b = DECK_SELECTED
+    text = (root / "pack" / "proposal.html").read_text(encoding="utf-8")
+    slides = h.slides_of(h.parse(text))
+    pages = [fill(slides[0].html(), {"title": "Tidewater Pass"}, [render_of(DECK_LEAD)], {"data-id": "cover"})]
+    pages.append(fill(_emit(root, "board"), None, [render_of(a)],
+                      {"data-id": "a-board", "data-concept": "A", "data-covers": "D1"}))
+    pages.append(fill(_emit(root, "plan"), None, [plan_of(a)], {"data-id": "a-plan", "data-concept": "A"}))
+    pages.append(fill(_emit(root, "board"), None, [render_of(b)], {"data-id": "b-board", "data-concept": "B"}))
+    pages.append(fill(_emit(root, "plan"), None, [plan_of(b)], {"data-id": "b-plan", "data-concept": "B"}))
+    pages.append(fill(_emit(root, "annotated"), None, [render_of(b)],
+                      {"data-id": "b-annotated", "data-concept": "B"}))
+    compare = _emit(root, "compare", 2).replace(
+        "</section>", '  <figure class="render" style="width:320px;height:200px"><img data-img="render" alt="" '
+        'src=""></figure>\n</section>')
+    pages.append(fill(compare, {"c1-why": 'Strong entrance <span data-ref="a-plan"></span>',
+                                "c2-why": 'Open lounge <span data-ref="D1"></span>'},
+                      [render_of(DECK_LEAD)], {"data-id": "compare"}))
+    claims = _emit(root, "table").replace('data-slot="r1-a"', 'data-slot="r1-a" data-claim="C1"')
+    pages.append(fill(claims, {"r1-a": "14 hybrid vessels in service", "title": "Claims to confirm"}, (),
+                      {"data-id": "claims", "data-role": "signoff", "data-part": "appendix"}))
+    body = "\n".join(p.rstrip("\n") + "\n" for p in pages)
+    out = text[:slides[0].start] + body + "\n" + text[slides[-1].end:].lstrip("\n")
+    project = common.find_project(str(root))
+    tree = h.parse(out)
+    h.refresh_refs(tree, project, None)
+    h.write_deck(project, tree.html())
+
+
+def deck_project(tmp_path, lang: str = "en") -> Path:
+    """tmp_path/deck-project: build_project (with the logo in brief/brand), two selected concepts (set-2/B shown as
+    A, set-1/A shown as B and lead), reviewed chosen renders, geometry and plans, and a deck of eight slides:
+    cover, a-board, a-plan, b-board, b-plan, b-annotated, compare, claims (signoff, appendix). Built once per
+    language with the real commands and copied for each caller."""
+    import atexit
+    import shutil
+    import tempfile
+    if lang not in _DECK_CACHE:
+        base = Path(tempfile.mkdtemp(prefix="deck-project-"))
+        atexit.register(shutil.rmtree, str(base), True)
+        _build_deck_project(base / "p", lang)
+        _DECK_CACHE[lang] = str(base / "p")
+    dest = Path(tmp_path) / "deck-project"
+    shutil.copytree(_DECK_CACHE[lang], dest)
+    return dest
+
+
+def _as_project(project):
+    return project if isinstance(project, common.Project) else common.find_project(str(project))
+
+
+def findings(project) -> list:
+    """The findings of deck_check.run_check for the project's deck (a Project or a folder)."""
+    import deck_check
+    return list(deck_check.run_check(_as_project(project)).findings)
+
+
+def has(project, code: str, rule: str | None = None) -> list:
+    """The findings with this code whose message starts with rule (any message when rule is None)."""
+    return [f for f in findings(project) if f.code == code and (rule is None or f.message.startswith(rule))]
+
+
+def write_render_json(project, overflow=(), upscale=(), *, measured: bool = True) -> str:
+    """Write work/render.json for the deck as it is now (current deck_sha256). Returns the path."""
+    import deck_html as h
+    p = _as_project(project)
+    text = h.read_deck(p) or ""
+    slides = len(h.slides_of(h.parse(text)))
+    path = p.path("work", "render.json")
+    common.write_json(path, {
+        "schema": "render/1", "deck_sha256": common.sha256_text(text), "rendered_at": common.now_iso(),
+        "browser": "test-browser", "slides": slides, "pdf_pages": slides, "previews": slides,
+        "measured": measured, "overflow": list(overflow), "upscale": list(upscale)})
+    return path
+
+
+def record(project, data: dict) -> int:
+    """Write work/deck-review.input.json and run deck.py review --record on it; returns the exit code."""
+    import deck
+    p = _as_project(project)
+    path = p.path("work", "deck-review.input.json")
+    common.write_json(path, data)
+    return deck.main(["review", "--record", path, "--project", p.root])
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Build a fictional demo project")
     ap.add_argument("out_dir")

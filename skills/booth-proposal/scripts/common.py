@@ -22,6 +22,9 @@ DEFAULTS = {  # contract 4.2, the only place a threshold number lives
     "candidates_per_concept": 2, "seconds_per_image": 100, "walkway_m": 0.9, "headroom_m": 2.1,
     "span_m": 1.5, "geometry_tol": 0.005, "claim_min_digits": 2, "tiles_grid": "3x2",
 }
+LEGIBLE_RATIO = 3.0  # least contrast ratio of text against its background (large-text level)
+PROJECT_FOLDERS = ("input", "refs", "brief", "concepts", "pack", "work", "renders", "prompts")  # project layout
+PLAIN_WORD_FOLDERS = ("input", "pack", "work")  # also ordinary words: text such as work/life is not a project path
 ROLES = ("cover", "agenda", "divider", "overview", "board", "compare", "annotated", "plan", "materials",
          "interaction", "response", "signoff", "text")  # contract 6.5
 MARK_TYPES = {"legible_text": "fail", "number": "fail", "name": "fail", "logo_like": "fail", "emblem": "fail",
@@ -332,7 +335,7 @@ def contrast(a, b) -> float:
     return (la + 0.05) / (lb + 0.05)
 
 
-def legible(fg: str, bg: str, ratio: float = 3.0) -> str | None:
+def legible(fg: str, bg: str, ratio: float = LEGIBLE_RATIO) -> str | None:
     """fg (#hex) mixed toward white on a dark background, toward black on a light one, until it reaches ratio
     against bg; None when either is not a hex colour."""
     f, b = hex_rgb(fg), hex_rgb(bg)

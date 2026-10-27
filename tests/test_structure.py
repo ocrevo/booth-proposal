@@ -20,10 +20,7 @@ REMOVED_NAMES = {
 B_FUNC = re.compile(r"^b_[a-z]+$")
 
 # Scripts not migrated yet: (test, file) -> phase that cleans it. Strict, so that phase removes the mark.
-XFAIL = {
-    ("cjk", "deck.py"): "phase 3",
-    ("names", "deck.py"): "phase 3",
-}
+XFAIL = {}
 
 
 def _params(kind):
