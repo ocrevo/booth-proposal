@@ -132,7 +132,7 @@ def test_no_sources_exit2(tmp_path):
 
 
 def test_repo_has_no_client_terms():
-    r = run("--paths", "skills", "tests", "tools", "README.md", "CHANGELOG.md", ".claude-plugin")
+    r = run("--paths", "skills", "docs", "tests", "tools", "README.md", "CHANGELOG.md", ".claude-plugin")
     if r.returncode == 2:
         pytest.skip(r.stderr.strip())
     # never print the matched term: only the count and file:line

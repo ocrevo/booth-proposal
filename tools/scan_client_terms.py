@@ -13,7 +13,7 @@ ROOT_DEFAULT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT_DEFAULT, "skills", "booth-proposal", "scripts"))
 import common  # noqa: E402
 
-DEFAULT_PATHS = ["skills", "tests", "tools", "README.md", "CHANGELOG.md", ".claude-plugin", "dist"]
+DEFAULT_PATHS = ["skills", "docs", "tests", "tools", "README.md", "CHANGELOG.md", ".claude-plugin", "dist"]
 SKIP_ANYWHERE = {".git", "__pycache__", "node_modules"}
 SKIP_TOP = {"input", "output"}          # skipped only as the first path component below the root
 TEXT_SUFFIXES = {".md", ".py", ".json", ".yaml", ".yml", ".txt", ".html", ".svg", ".css", ".js", ".sh", ".toml",

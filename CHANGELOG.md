@@ -15,6 +15,9 @@
 - Docs reorganised into one reference per step (`1-brief.md`, `2-frame.md`, `3-ideas.md`, `4-renders.md`, `5-develop.md`, `6-proposal.md`) plus `review.md`; the README is rewritten in Chinese.
 - New: tests for docs, scripts and release; rewritten evals with fictional inputs; the client-term scanner `tools/scan_client_terms.py`; the eval grader `tools/eval_grade.py`; the deterministic build `tools/build_dist.py` (the `dist/` file is byte-identical across builds and leaves out `evals/`).
 - Removed: the page generators and the fixed page plan, scraping of `concept.md` text, style-card and design-points parsing, the rule that at least one concept must not come from the references, the intensity and supporting-system tables, massing images in the proposal, `pack/check.txt`, `pack/preview/`, and the worked example.
+- `docs/proposal-strategies.md`: how international exhibition and brand-experience agencies structure a proposal, with a comparison against this skill's outline.
+- README: the proposal outline and the layouts available for each page role.
+- The client-term scanner also scans `docs/`.
 
 ## 0.5.0 – 2026-10-26
 
