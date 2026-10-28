@@ -31,7 +31,11 @@
     "pass": "通过",
     "fail": "不通过",
     "none": "（无）",
-    "cost_line": "{concepts} 个方案 × 每个 {per} 张候选 = {images} 张，逐张出图约 {minutes} 分钟"
+    "cost_line": "{concepts} 个方案 × 每个 {per} 张候选 = {images} 张，逐张出图约 {minutes} 分钟",
+    "cost_line_one": "{concepts} 个方案 × 每个 {per} 张候选 = {images} 张，逐张出图约 {minutes} 分钟",
+    "graphics": "平面稿",
+    "cost_graphics": "{graphics} 张平面稿 × 每张 {per} 张候选 = {images} 张，逐张出图约 {minutes} 分钟",
+    "cost_graphics_one": "{graphics} 张平面稿 × 每张 {per} 张候选 = {images} 张，逐张出图约 {minutes} 分钟"
   },
   "separate": {"title": "另行提交", "sentence": "执行工期、现场人员与报价另行提交。"}
 }

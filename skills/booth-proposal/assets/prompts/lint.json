@@ -14,5 +14,12 @@
     "panel that reads", "text that reads", "words that read", "letters that read"],
   "one_per_patterns": ["\\bone\\s+(?:per|for\\s+(?:each|every))\\b",
     "\\b(?:each|every)\\s+(?:one\\s+)?(?:representing|standing\\s+for|symboli[sz]ing)\\b",
-    "\\b(?:representing|symboli[sz]ing)\\s+(?:each|every|one)\\s+of\\b"]
+    "\\b(?:representing|symboli[sz]ing)\\s+(?:each|every|one)\\s+of\\b"],
+  "text_area_words": ["empty", "kept empty", "left empty", "plain", "calm", "clear", "free of", "negative space",
+    "copy space", "open field", "quiet field"],
+  "graphic_text_phrases": ["headline", "headlines", "tagline", "taglines", "title in", "titles in", "in bold type",
+    "name painted", "names painted", "painted name", "painted names", "caption", "captions", "typography",
+    "lettering", "wordmark"],
+  "area_filled_words": ["fills", "filled", "covers", "covered", "occupies", "occupied"],
+  "area_words": {"top": ["top", "upper"], "bottom": ["bottom", "lower"], "left": ["left"], "right": ["right"]}
 }

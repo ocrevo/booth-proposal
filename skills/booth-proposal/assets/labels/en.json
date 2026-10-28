@@ -31,7 +31,11 @@
     "pass": "pass",
     "fail": "fail",
     "none": "(none)",
-    "cost_line": "{concepts} concepts × {per} candidates = {images} images, about {minutes} min if run one after another"
+    "cost_line": "{concepts} concepts × {per} candidates = {images} images, about {minutes} min if run one after another",
+    "cost_line_one": "{concepts} concept × {per} candidates = {images} images, about {minutes} min if run one after another",
+    "graphics": "Graphics",
+    "cost_graphics": "{graphics} graphics × {per} candidates = {images} images, about {minutes} min if run one after another",
+    "cost_graphics_one": "{graphics} graphic × {per} candidates = {images} images, about {minutes} min if run one after another"
   },
   "separate": {"title": "Submitted separately", "sentence": "The schedule, on-site staffing and pricing are submitted separately."}
 }

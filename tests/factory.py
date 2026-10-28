@@ -38,6 +38,13 @@ def _next_rgb() -> tuple[int, int, int]:
     return (i & 255, (i >> 8) & 255, (i * 29 + 60) & 255)
 
 
+def _next_light_rgb() -> tuple[int, int, int]:
+    """Like _next_rgb but light (every channel 200-255): the text of a graphic page (data-tone dark) reads on it."""
+    i = _COLOUR_COUNTER[0]
+    _COLOUR_COUNTER[0] += 1
+    return (200 + i % 56, 200 + (i // 56) % 56, 200 + (i // 3136) % 56)
+
+
 def png_bytes(rgb, size=(64, 48)) -> bytes:
     from PIL import Image
     buf = io.BytesIO()
@@ -68,12 +75,19 @@ DELIVERABLES = [
 ]
 
 
-def brief_dict(lang="en", arch=None, rich=False) -> dict:
+# one requested graphic: a tall panel for the back wall, drawn from the product photo and the claim C2
+GRAPHICS = [{"id": "GR1", "title": "Fleet story", "purpose": "Back wall panel", "ratio": "2:3",
+             "refs": ["input/product.png"], "content": ["C2"]}]
+
+
+def brief_dict(lang="en", arch=None, rich=False, graphics=False) -> dict:
     out = _brief_base(lang)
     out["clauses"] = copy.deepcopy(CLAUSES)
     if rich:
         out["clauses"].append(copy.deepcopy(MIXED_CLAUSE))
         out["deliverables"] = copy.deepcopy(DELIVERABLES)
+    if graphics:
+        out["graphics"] = copy.deepcopy(GRAPHICS)
     if arch is not None:
         out["proposal"] = {"architecture": arch}
     return out
@@ -141,7 +155,13 @@ def ideas_dict(sets=("set-1", "set-2")) -> dict:
 def fake_send(url, key, fields, images, image_field) -> dict:
     """Same signature as render.send; records the call and returns n new images."""
     SEND_LOG.append({"url": url, "fields": dict(fields), "images": list(images)})
-    data = [{"b64_json": base64.b64encode(png_bytes(_next_rgb())).decode("ascii")}
+    size = (64, 48)
+    graphic = fields.get("size") not in (None, "1536x1024")
+    if graphic:                                              # a graphic: small, in the ratio that was asked for
+        w, h = (int(v) for v in str(fields["size"]).split("x"))
+        size = (64, round(64 * h / w))
+    colour = _next_light_rgb if graphic else _next_rgb        # a graphic is light: legible dark text over it
+    data = [{"b64_json": base64.b64encode(png_bytes(colour(), size)).decode("ascii")}
             for _ in range(int(fields["n"]))]
     return {"data": data, "usage": {"total_tokens": 0}}
 
@@ -180,6 +200,63 @@ def _render_hero(root, concept_key: str, prompt_rel: str, refs: list[str]) -> No
             contextlib.redirect_stdout(io.StringIO()):
         code = render.main(argv)
     assert code == 0, f"render.py hero failed for {concept_key}"
+
+
+def graphic_ok(refs: bool = True) -> str:
+    """A graphic prompt that passes lint for GR1 with --area top: the template with the shipped fixed sentences.
+    refs=False drops the sentence about attached photos."""
+    import json
+    fixed = json.loads((SCRIPTS.parent / "assets" / "prompts" / "fixed.json").read_text(encoding="utf-8"))
+    text = GRAPHIC_OK_TEMPLATE.format(**fixed)
+    return text if refs else text.replace("\n" + fixed["graphic_ref"] + "\n", "")
+
+
+GRAPHIC_OK_TEMPLATE = """Graphic \u2013 Calm Crossing: a tall wall panel that introduces the ferry line to visitors at the stand.
+
+Brand colours: deep navy #0B3D5C, signal yellow #F2B705, white
+
+Composition:
+- A tall portrait panel in a flat, layered paper-cut style with soft grain.
+- The upper third is kept empty: a calm field of deep navy for the title, and nothing reaches into it.
+- The subject fills the lower part, centred, with a quiet margin at every edge.
+
+Subject:
+- A modern hybrid ferry crossing a calm fjord at dawn, seen from the side, low hills behind.
+- Gulls and a soft wake; the hull panels are plain.
+{graphic_no_text}
+{graphic_text_area}
+
+{graphic_ref}
+"""
+
+
+def _render_graphic(root, gid: str = "GR1", area: str = "top", n: int = 2, refs=("input/product.png",)) -> None:
+    """Write graphic-v1..vN through the real render.py graphic (lint, call, save) with the network replaced."""
+    prompt_rel = f"graphics/{gid}/prompts/graphic.txt"
+    _write(Path(root) / prompt_rel, graphic_ok(refs=bool(refs)))
+    argv = ["graphic", "--graphic", gid, "--prompt", prompt_rel, "--area", area, "--candidates", str(n)]
+    for r in refs:
+        argv += ["--ref", r]
+
+    def no_network(*a, **k):
+        raise AssertionError("network")
+
+    with contextlib.chdir(root), \
+            mock.patch.object(render, "send", fake_send), \
+            mock.patch("urllib.request.urlopen", side_effect=no_network), \
+            mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test-key-not-real"}), \
+            contextlib.redirect_stdout(io.StringIO()):
+        code = render.main(argv)
+    assert code == 0, f"render.py graphic failed for {gid}"
+
+
+def review_graphic_pass(root, image_rel: str, scope: str = "full") -> None:
+    """Record a passing review of a graphic image through render.py review."""
+    argv = ["review", image_rel, "--reviewer", "subagent", "--verdict", "pass", "--premium", "yes",
+            "--scope", scope, "--text-area", "yes", "--marks-json", "[]", "--project", str(root)]
+    with contextlib.chdir(root), contextlib.redirect_stdout(io.StringIO()):
+        code = render.main(argv)
+    assert code == 0, f"render.py review failed for {image_rel}"
 
 
 def review_pass(root, image_rel: str, scope: str = "full") -> None:
@@ -246,8 +323,34 @@ def add_render(root, key: str, name: str, *, mode: str = "hero", base: str | Non
     return rel
 
 
+def put_graphic_sidecar(root, image_rel: str, mode: str, *, area: str = "top", ratio: str = "2:3",
+                        base: str | None = None, refs=(), kind: str | None = "graphic") -> None:
+    """Write a sidecar/2 beside graphics/<GR>/renders/<name> (hashes read from the files now). kind None leaves
+    the kind key out; base/refs are project-relative paths."""
+    root = Path(root)
+    parts = image_rel.split("/")
+    image = str(root / image_rel)
+    inputs = [{"role": "ref", "path": r, "sha256": common.sha256_file(str(root / r))} for r in refs]
+    if base:
+        inputs.append({"role": "base", "path": base, "sha256": common.sha256_file(str(root / base))})
+    data = {"tool": "render.py", "mode": mode, "set": None, "concept": None, "inputs": inputs,
+            "prompt_sha256": None, "lint": None, "api": None}
+    if kind is not None:
+        data.update({"kind": kind, "graphic": parts[1], "area": area, "ratio": ratio})
+    common.write_sidecar(image, data)
+
+
+def add_graphic(root, gid: str, name: str, *, mode: str = "graphic", data: bytes | None = None, **kw) -> str:
+    """Write a new image graphics/<gid>/renders/<name> (a fresh 64x96 colour unless data is given) and its
+    sidecar (kw goes to put_graphic_sidecar). Returns the project-relative path."""
+    rel = f"graphics/{gid}/renders/{name}"
+    _write(Path(root) / rel, data if data is not None else png_bytes(_next_light_rgb(), (64, 96)))
+    put_graphic_sidecar(root, rel, mode, **kw)
+    return rel
+
+
 def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaffold=True,
-                  renders=True, chosen=True, style=None, arch=None, rich=False) -> Path:
+                  renders=True, chosen=True, style=None, arch=None, rich=False, graphics=False) -> Path:
     root = Path(root)
     if root.exists() and any(root.iterdir()):
         raise ValueError(f"{root} is not empty")
@@ -257,7 +360,7 @@ def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaf
         raise ValueError("scaffold needs ideas=True")
     root.mkdir(parents=True, exist_ok=True)
 
-    common.write_json(str(root / "brief" / "brief.json"), brief_dict(lang, arch, rich))
+    common.write_json(str(root / "brief" / "brief.json"), brief_dict(lang, arch, rich, graphics))
     if style is not None:
         common.write_json(str(root / "brief" / "deck-style.json"), style)
 
@@ -359,11 +462,13 @@ def fill(fragment: str, texts: dict | None = None, imgs=(), attrs: dict | None =
     return sec.html() + "\n"
 
 
-def _emit(root, spec: str, count: int | None = None) -> str:
+def _emit(root, spec: str, count: int | None = None, graphic: str | None = None) -> str:
     import deck
     argv = ["layouts", "--emit", spec, "--project", str(root)]
     if count is not None:
         argv[3:3] = ["--count", str(count)]
+    if graphic is not None:
+        argv += ["--graphic", graphic]
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         code = deck.main(argv)
@@ -371,18 +476,23 @@ def _emit(root, spec: str, count: int | None = None) -> str:
     return out.getvalue()
 
 
-def _deck_base(root: Path, lang: str, arch: str, rich: bool = False):
+def _deck_base(root: Path, lang: str, arch: str, rich: bool = False, graphics: bool = False):
     """The project of the deck fixtures up to the new deck: build_project, reviewed chosen renders, selection,
-    geometry and plans, then deck.py new. Returns (render_of, plan_of)."""
+    geometry and plans, then deck.py new. With graphics, GR1 is rendered, reviewed and chosen (graphic-v2).
+    Returns (render_of, plan_of)."""
     import deck
     import draw_plan
-    build_project(root, lang=lang, style={"logo": "brand/logo.png"}, arch=arch, rich=rich)
+    build_project(root, lang=lang, style={"logo": "brand/logo.png"}, arch=arch, rich=rich, graphics=graphics)
     brief = common.read_json(str(root / "brief" / "brief.json"))
     brief["protected_terms"].append("Tidewater C1")
     common.write_json(str(root / "brief" / "brief.json"), brief)
     _write(root / "input" / "tender-brief.docx", b"PK fictional tender document")
     for key in ("set-1/A", "set-1/B", "set-2/A", "set-2/B"):
         review_pass(root, f"concepts/{key}/renders/hero-v2.png")
+    if graphics:
+        _render_graphic(root)
+        review_graphic_pass(root, "graphics/GR1/renders/graphic-v2.png")
+        _write(root / "graphics" / "GR1" / "graphic.md", "---\nchosen: renders/graphic-v2.png\n---\nNotes.\n")
     assert gates.main(["select", *DECK_SELECTED, "--lead", DECK_LEAD, "--project", str(root)]) == 0
     specs = {"set-2/B": _geometry("A · Canopy Lounge", "Canopy arch", "Coffee bar"),
              "set-1/A": _geometry("B · Tidal Gate", "Boarding arch", "Info counter")}
@@ -439,9 +549,10 @@ def _write_deck_pages(root: Path, pages: list) -> None:
     h.write_deck(project, tree.html())
 
 
-def _build_deck_project(root: Path, lang: str, arch: str = "showcase", rich: bool = False) -> None:
+def _build_deck_project(root: Path, lang: str, arch: str = "showcase", rich: bool = False,
+                        graphics: bool = False) -> None:
     import deck_html as h
-    render_of, plan_of = _deck_base(root, lang, arch, rich)
+    render_of, plan_of = _deck_base(root, lang, arch, rich, graphics)
     text = (root / "pack" / "proposal.html").read_text(encoding="utf-8")
     slides = h.slides_of(h.parse(text))
     if arch == "showcase":
@@ -455,8 +566,14 @@ def _build_deck_project(root: Path, lang: str, arch: str = "showcase", rich: boo
                  fill(sk["design"], {"sub": "Two concepts answering the tender point by point"})]
         pages += _body_pages(root, render_of, plan_of)
         pages.append(fill(sk["interaction"], {"sub": "How visitors try the Tidewater Pass app"}))
-        if rich:
+        if rich or graphics:
             pages.append(fill(sk["graphics"], {"sub": "The graphic design direction for the stand"}))
+        if graphics:
+            pages.append(fill(_emit(root, "graphic", graphic="GR1"),
+                              {"kicker": "Nordvik Ferries", "headline": "Sail the quiet way",
+                               "line": "Shortest crossing on the route", "label": "Back wall", "title": "Fleet story",
+                               "para": "A calm dawn crossing introduces the line before visitors reach the counter.",
+                               "spec": "Portrait panel, back wall"}, (), {"data-id": "gr1"}))
         pages.append(sk["separate"])
         brief = common.read_json(str(root / "brief" / "brief.json"))
         clauses = common.clauses_of(brief)
@@ -484,25 +601,28 @@ def _build_deck_project(root: Path, lang: str, arch: str = "showcase", rich: boo
     _write_deck_pages(root, pages)
 
 
-def deck_project(tmp_path, lang: str = "en", arch: str = "showcase", rich: bool = False) -> Path:
+def deck_project(tmp_path, lang: str = "en", arch: str = "showcase", rich: bool = False,
+                 graphics: bool = False) -> Path:
     """tmp_path/deck-project (showcase) or tmp_path/deck-project-<arch>: build_project (with the logo in
     brief/brand), two selected concepts (set-2/B shown as A, set-1/A shown as B and lead), reviewed chosen
     renders, geometry and plans, and a deck. Showcase: eight slides (cover, a-board, a-plan, b-board, b-plan,
     b-annotated, compare, claims). Tender: cover, understanding, design, the six concept pages, interaction,
     separate, the clause table, claims. rich (tender): the brief also has a mixed clause and four deliverables, so
-    the deck adds the graphics page and the table has nine rows. Built once per (language, architecture, rich)
-    with the real commands and copied for each caller."""
+    the deck adds the graphics page and the table has nine rows. graphics (tender): the brief lists the graphic
+    GR1, which is rendered, reviewed and chosen (graphic-v2), and the deck has a graphic page (data-id gr1) after
+    the graphics divider. Built once per (language, architecture, rich, graphics) with the real commands and
+    copied for each caller."""
     import atexit
     import shutil
     import tempfile
-    key = (lang, arch, rich)
+    key = (lang, arch, rich, graphics)
     if key not in _DECK_CACHE:
         base = Path(tempfile.mkdtemp(prefix="deck-project-"))
         atexit.register(shutil.rmtree, str(base), True)
-        _build_deck_project(base / "p", lang, arch, rich)
+        _build_deck_project(base / "p", lang, arch, rich, graphics)
         _DECK_CACHE[key] = str(base / "p")
     name = "deck-project" if arch == "showcase" else f"deck-project-{arch}"
-    dest = Path(tmp_path) / (name + "-rich" if rich else name)
+    dest = Path(tmp_path) / (name + ("-rich" if rich else "") + ("-graphics" if graphics else ""))
     shutil.copytree(_DECK_CACHE[key], dest)
     return dest
 

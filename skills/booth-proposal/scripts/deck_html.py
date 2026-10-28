@@ -846,7 +846,36 @@ def _report(e) -> int:
     return 2
 
 
-def cmd_layouts(project, emit_spec, count, chapter=None) -> int:
+def _fill_graphic(out, ex, project, gid) -> str:
+    """The graphic fragment with its image (the chosen render of graphic.md, relative to pack/), data-ratio (the
+    brief ratio) and data-area (the area the chosen render keeps empty) filled in."""
+    g = common.graphic_ref(project, gid)          # InputError when brief.json lists no such graphic
+    md = common.owner_md(g)[1]
+    fm, _ = common.read_front_matter(g)
+    if not fm.get("chosen"):
+        raise DeckError(f"{g.id} has no chosen render in {md}")
+    image = os.path.normpath(os.path.join(g.dir, fm["chosen"]))
+    sec = element(out)
+    fig = sec.find(lambda n: n.tag == "figure" and n.has_class("graphic"))
+    img = fig.find(lambda n: n.tag == "img") if fig is not None else None
+    if fig is None or img is None:
+        raise DeckError(f"the {ex.layout} layout has no figure.graphic with an img")
+    ratio = (common.graphic_item(project.brief, g.id) or {}).get("ratio")
+    area = (common.read_sidecar(image) or {}).get("area")
+    img.set("src", os.path.relpath(image, project.path("pack")).replace("\\", "/"))
+    if isinstance(ratio, str) and ratio:
+        fig.set("data-ratio", ratio)
+    if area in common.GRAPHIC_AREAS:
+        fig.set("data-area", area)
+    value = common.ratio_value(ratio)
+    if value is not None and (value > 1) != (ex.variant == "wide"):
+        shape = "landscape" if value > 1 else "portrait" if value < 1 else "square"
+        fits = f"{ex.layout}:wide" if value > 1 else ex.layout
+        print(f"note: {g.id} is {shape} ({ratio}); {fits} fits it", file=sys.stderr)
+    return sec.html() + "\n"
+
+
+def cmd_layouts(project, emit_spec, count, chapter=None, graphic=None) -> int:
     try:
         arch = common.architecture_for(project)
         tpl = load_template(DEFAULT_TEMPLATE)
@@ -857,6 +886,8 @@ def cmd_layouts(project, emit_spec, count, chapter=None) -> int:
         if ex is None:
             raise DeckError(f"unknown layout '{emit_spec}'; run deck.py layouts")
         out = emit(ex, project, count)
+        if graphic is not None:
+            out = _fill_graphic(out, ex, project, graphic)
         if chapter is not None:
             ids = [c["id"] for c in arch["chapters"]]
             if chapter not in ids:

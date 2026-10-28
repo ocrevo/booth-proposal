@@ -99,9 +99,10 @@
         "en": "Graphic design",
         "zh": "平面设计"
       },
-      "purpose": "Only when the brief lists graphics or has graphics clauses or deliverables: the design direction in words, then one page per requested graphic (a text-only page is fine until the graphic images exist).",
+      "purpose": "Only when the brief asks for graphics: one page per requested graphic, the chosen graphic render with its text set over the empty area (layout graphic).",
       "roles": [
         "divider",
+        "graphic",
         "text"
       ],
       "required": "if-kind",

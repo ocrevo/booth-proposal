@@ -23,7 +23,8 @@ def test_labels():
     assert zh["lang"] == "zh" and en["lang"] == "en"
     assert "schema" not in zh and "schema" not in en
     for d in (zh, en):
-        assert set(d["report"]) == {"brief", "ideas", "renders", "concepts", "pass", "fail", "none", "cost_line"}
+        assert set(d["report"]) == {"brief", "ideas", "renders", "concepts", "pass", "fail", "none", "cost_line",
+                                    "cost_line_one", "graphics", "cost_graphics", "cost_graphics_one"}
         assert d["chrome"]["concept"].count("{}") == 1
         for fmt in d["ref_formats"].values():
             assert isinstance(fmt.format(3), str)

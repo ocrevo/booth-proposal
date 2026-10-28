@@ -22,7 +22,7 @@
                     Every unfilled leaf slot starts with the literal text "TODO" or "TODO: hint".
   - data-repeat   : data-repeat="group" marks the repeat units of an example (one group per example);
                     --emit --count N keeps or clones units and renumbers their slots and numbers.
-  - data-img      : "render", "plan" or "logo" on every img (informational: what belongs there).
+  - data-img      : "render", "plan", "logo" or "graphic" on every img (informational: what belongs there).
                     Template images are data: placeholders; --emit empties src; deck paths are relative to pack/.
   - data-auto     : an element filled by --emit and new with the labels value at that dotted key
                     ({} = the nearest data-concept letter). data-auto="separate.item" marks the list items of the
@@ -34,6 +34,12 @@
     Plans, site   : figure.pic.contain holding one img (no stamp, letterboxed).
     Annotations   : figure.render.annotated holding one img and .pin callouts; data-x and data-y place a
                     pin in percent of the figure (the viewer script sets left and top).
+    Graphics      : figure.graphic holding one img (the chosen graphic render) and div.gtext (the text set over the
+                    artwork). data-ratio = the brief ratio (a:b; the viewer sets --rw and --rh from it), data-area =
+                    top, bottom, left or right (where the artwork is empty, as render.py graphic --area), data-tone =
+                    dark (default: --ink-strong text, for a light area) or light (--paper text, for a dark area); no
+                    other value, and deck.py check warns when the text is hard to read on the area. The logo is already in the image (render.py logo).
+                    deck.py layouts --emit graphic --graphic GR1 fills all three.
   - data-claim    : data-claim="Cn" on an element marks a claim awaiting client sign-off; the ID never shows,
                     CSS draws the --claim-label tag after the element.
   - data-ref      : a design-point ID or a page data-id; deck.py render writes the page reference text
@@ -437,6 +443,31 @@ figure.annotated .pin{position:absolute;z-index:4;transform:translate(-14px,-14p
 .gallery.g4 .item{display:grid;grid-template-columns:minmax(0,1fr) 300px;column-gap:var(--g);align-items:end}
 .gallery.g4 .item>figure,.gallery.g4 .item>.placeholder{height:100%}
 .gallery.g4 .cap{margin:0;padding-top:14px;border-top:1px solid var(--ink-strong)}
+
+/* ---------- graphic (a requested graphic: artwork at its ratio, text over its empty area) ---------- */
+.slide.graphic{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:96px;align-items:center}
+figure.graphic{position:relative;overflow:hidden;height:864px;width:auto;
+  aspect-ratio:var(--rw,2) / var(--rh,3);background:var(--surface);box-shadow:0 0 0 1px var(--line)}
+figure.graphic>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+figure.graphic .gtext{position:absolute;z-index:2;display:flex;flex-direction:column;gap:var(--s2);padding:7%;color:var(--ink-strong)}
+/* data-tone: dark = --ink-strong text (light area), light = --paper text (dark area); deck_check.GRAPHIC_TONES */
+figure.graphic[data-tone=light] .gtext{color:var(--paper)}
+figure.graphic[data-area=top] .gtext{top:0;left:0;right:0;max-height:38%}
+figure.graphic[data-area=bottom] .gtext{bottom:0;left:0;right:0;max-height:38%;justify-content:flex-end}
+figure.graphic[data-area=left] .gtext{top:0;bottom:0;left:0;width:44%;justify-content:center}
+figure.graphic[data-area=right] .gtext{top:0;bottom:0;right:0;width:44%;justify-content:center}
+.gtext .gk{font-size:var(--fs-label);font-weight:700;letter-spacing:var(--track-label);line-height:1.5}
+.gtext .gh{font-size:var(--fs-title);font-weight:700;line-height:1.2}
+.gtext .gp{font-size:var(--fs-body);line-height:1.5}
+.slide.graphic .side{display:flex;flex-direction:column;align-self:stretch;min-height:0;overflow:hidden;max-width:820px}
+.slide.graphic .side .title{font-size:var(--fs-title);font-weight:700;line-height:1.25;color:var(--ink-strong);margin-top:var(--s2)}
+.slide.graphic .side .rule-s{display:block;width:72px;height:6px;background:var(--accent);margin:var(--s5) 0 var(--s4)}
+.slide.graphic .side .t{max-width:680px;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--ink)}
+.slide.graphic .side .note{margin-top:auto;font-size:var(--fs-small);color:var(--muted-text)}
+.slide.graphic.wide{grid-template-columns:none;grid-template-rows:auto minmax(0,1fr);row-gap:var(--s5);justify-items:center;align-items:start}
+.slide.graphic.wide figure.graphic{height:auto;width:min(100%,calc(600px * var(--rw,16) / var(--rh,9)));aspect-ratio:var(--rw,16) / var(--rh,9)}
+/* the notes strip is as wide as the panel and sits centred under it */
+.slide.graphic.wide .side{align-self:start;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);column-gap:var(--g);max-width:none;width:min(100%,calc(600px * var(--rw,16) / var(--rh,9)))}
 
 /* ---------- table (long tables continue on the next slide: same title + the "cont" label) ---------- */
 .tbl{width:100%;border-collapse:collapse;table-layout:fixed;font-size:var(--fs-small);line-height:1.55}
@@ -949,6 +980,52 @@ html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
 </section>
 
 <!-- ===================================================================
+     GRAPHIC – one requested graphic at its own ratio (portrait or square): the artwork fills the panel, the
+     headline sits over the area the artwork keeps empty; notes on the right
+     kicker 16 chars · headline 20 chars · line 60 chars · label 16 · title 22 · para 120 · spec 40
+     =================================================================== -->
+<section class="slide graphic" data-id="graphic" data-roles="graphic">
+  <figure class="graphic" data-ratio="2:3" data-area="top" data-tone="dark">
+    <img data-img="graphic" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1536' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1024' height='1536' fill='%23cfccc4'/%3E%3Crect y='1000' width='1024' height='536' fill='%23c3bfb6'/%3E%3Cpath d='M140 1360 240 1170H784L884 1360Z' fill='%23b5b0a6'/%3E%3Cpath d='M330 1170V820H694V1170Z' fill='%23a8a398'/%3E%3Cpath d='M420 1170V900H520V1170Z' fill='%23bdb8ad'/%3E%3C/svg%3E">
+    <div class="gtext">
+      <p class="gk" data-slot="kicker" data-max="16">TODO: short line</p>
+      <h2 class="gh" data-slot="headline" data-max="20">TODO: headline</h2>
+      <p class="gp" data-slot="line" data-max="60">TODO: one supporting line</p>
+    </div>
+  </figure>
+  <div class="side">
+    <p class="label acc" data-slot="label" data-max="16">TODO: where it hangs</p>
+    <h1 class="title" data-slot="title" data-max="22">TODO: graphic title</h1>
+    <i class="rule-s"></i>
+    <p class="t" data-slot="para" data-max="120">TODO: what the graphic says and why</p>
+    <p class="note" data-slot="spec" data-max="40">TODO: format and placement</p>
+  </div>
+</section>
+
+<!-- GRAPHIC · wide – a landscape graphic: the panel on top at its ratio, notes in a strip below -->
+<section class="slide graphic wide" data-id="graphic-wide" data-roles="graphic">
+  <figure class="graphic" data-ratio="16:9" data-area="left" data-tone="dark">
+    <img data-img="graphic" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 900' preserveAspectRatio='xMidYMid slice'%3E%3Crect width='1600' height='900' fill='%23cfccc4'/%3E%3Crect y='560' width='1600' height='340' fill='%23c3bfb6'/%3E%3Cpath d='M860 760 930 640H1470L1540 760Z' fill='%23b5b0a6'/%3E%3Cpath d='M1010 640V360H1390V640Z' fill='%23a8a398'/%3E%3Cpath d='M1090 640V430H1190V640Z' fill='%23bdb8ad'/%3E%3C/svg%3E">
+    <div class="gtext">
+      <p class="gk" data-slot="kicker" data-max="16">TODO: short line</p>
+      <h2 class="gh" data-slot="headline" data-max="20">TODO: headline</h2>
+      <p class="gp" data-slot="line" data-max="60">TODO: one supporting line</p>
+    </div>
+  </figure>
+  <div class="side">
+    <div>
+      <p class="label acc" data-slot="label" data-max="16">TODO: where it hangs</p>
+      <h1 class="title" data-slot="title" data-max="22">TODO: graphic title</h1>
+      <i class="rule-s"></i>
+    </div>
+    <div>
+      <p class="t" data-slot="para" data-max="120">TODO: what the graphic says and why</p>
+      <p class="note" data-slot="spec" data-max="40">TODO: format and placement</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================================
      TABLE – response and sign-off tables; up to 9 rows of up to 2 lines per slide, continue on the next
      slide with the same title + the "cont" label. No IDs and no citations in any cell.
      Column widths via colgroup/col style="width:N%" · cells 40 / 60 / 24 chars · note 80 chars
@@ -1009,6 +1086,11 @@ html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
   Array.prototype.forEach.call(document.querySelectorAll('figure.annotated .pin[data-x][data-y]'), function (p) {
     p.style.left = parseFloat(p.getAttribute('data-x')) + '%';
     p.style.top = parseFloat(p.getAttribute('data-y')) + '%';
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('figure.graphic[data-ratio]'), function (f) {
+    var m = /^\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)\s*$/.exec(f.getAttribute('data-ratio') || '');
+    if (m) { [f, f.parentNode].forEach(function (e) { e.style.setProperty('--rw', m[1]); e.style.setProperty('--rh', m[2]); }); }
   });
 
   if (solo >= 1 && solo <= slides.length) {

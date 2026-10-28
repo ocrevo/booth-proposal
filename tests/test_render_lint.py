@@ -143,7 +143,8 @@ def test_data_files_shape():
         assert "schema" not in json.loads(raw)
     fixed, data = render.load_prompt_data()
     assert sorted(fixed) == sorted(render.FIXED_KEYS)
-    assert sorted(data) == ["logo_text_phrases", "one_per_patterns", "timeline_words"]
+    assert sorted(data) == ["area_filled_words", "area_words", "graphic_text_phrases", "logo_text_phrases",
+                            "one_per_patterns", "text_area_words", "timeline_words"]
     for word in ("logo", "slogan", "century", "reads", "reading"):
         assert word not in data["logo_text_phrases"] and word not in data["timeline_words"]
 

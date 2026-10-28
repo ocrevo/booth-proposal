@@ -27,7 +27,7 @@ Fill the brackets from brief.json, and pass the brief to the reviewer as it stan
 ```
 You are reviewing one concept render of an exhibition stand for a design proposal. You see only the image and its tiles. You do not know the brief, the prompt or the idea; do not guess them.
 Booth: [W] m wide, [D] m deep, at most [H] m high. One person is about [person_height_m] m, so the platform should read about [w] person-heights wide and [d] deep, and nothing should rise above about [h] person-heights. Open sides: [sides]. Functions that should be visible: [program].
-1. Marks. Look at the whole image, then at every tile. List every mark, with a type from this list only: legible_text, number, name, logo_like, emblem, pseudo_text_legible, pseudo_text, venue_background. Use pseudo_text_legible when a viewer of the whole image at slide size would read it as letters or characters; pseudo_text when it only reads as texture. A blurred hall sign behind the stand is venue_background. For each mark give where (a tile name such as r1c2, or whole) and a short note.
+1. Marks. Look at the whole image, then at every tile. List every mark, with a type from this list only: legible_text, number, name, logo_like, emblem, pseudo_text_legible, pasted_photo, pseudo_text, venue_background. Use pseudo_text_legible when a viewer of the whole image at slide size would read it as letters or characters; pseudo_text when it only reads as texture. A blurred hall sign behind the stand is venue_background. For each mark give where (a tile name such as r1c2, or whole) and a short note.
 2. Size. With the people as the scale, estimate the stand's width, its depth and the height of its tallest element, in person-heights, to one decimal.
 3. Premium. Would this image hold the cover of a top studio's proposal? Answer yes or no, then one sentence. Ask yourself: Is one main form carried fully while everything else stays quiet? Are the functions folded into the main form rather than scattered as furniture? Is the plain logo panel the only place a brand would go? Is the light restrained rather than every edge lit? Is the counter clear? Does it avoid the interchangeable minimal look, white walls, pale wood and a cove of light that could belong to any brand?
 4. Verdict. pass or fail, and two sentences on why.
@@ -56,6 +56,7 @@ Code writes `<stem>.review.json` next to the image, with the deviation, `within`
 | `pseudo_text_legible` | fail | verdict fail |
 | `pseudo_text` | record | none |
 | `venue_background` | record | none |
+| `pasted_photo` | fail | verdict fail; a graphic shows the attached product photo pasted or traced instead of redrawn |
 | `composited_logo` | allow | none, only on the output of `render.py logo` with an official logo file; anywhere else it counts as `logo_like` |
 
 The output of `render.py logo` inherits the base's review plus a `composited_logo` mark; review it again only when the composite covered more than the plain panel.

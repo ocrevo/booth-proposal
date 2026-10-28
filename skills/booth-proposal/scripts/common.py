@@ -30,13 +30,17 @@ CLAUSE_N_RE = re.compile(r"\d{1,3}(?:\.\d{1,3}){0,3}[a-z]?")   # 2, 8.1, 4.2.1, 
 _ARCH_ID_RE = re.compile(r"[a-z][a-z0-9-]{0,31}")
 _REQUIRED = ("always", "never", "if-kind")
 LEGIBLE_RATIO = 3.0  # least contrast ratio of text against its background (large-text level)
-PROJECT_FOLDERS = ("input", "refs", "brief", "concepts", "pack", "work", "renders", "prompts")  # project layout
-PLAIN_WORD_FOLDERS = ("input", "pack", "work")  # also ordinary words: text such as work/life is not a project path
+GRAPHICS_FOLDER = "graphics"                # the only literal of the graphics folder name in code
+PROJECT_FOLDERS = ("input", "refs", "brief", "concepts", "pack", "work", "renders", "prompts",
+                   GRAPHICS_FOLDER)  # project layout
+PLAIN_WORD_FOLDERS = ("input", "pack", "work", GRAPHICS_FOLDER)  # also ordinary words: work/life is not a project path
 ROLES = ("cover", "agenda", "divider", "overview", "board", "compare", "annotated", "plan", "materials",
-         "interaction", "response", "signoff", "text")  # contract 6.5
+         "interaction", "response", "signoff", "text", "graphic")  # contract 6.5
 MARK_TYPES = {"legible_text": "fail", "number": "fail", "name": "fail", "logo_like": "fail", "emblem": "fail",
-              "pseudo_text_legible": "fail", "pseudo_text": "record", "venue_background": "record",
-              "composited_logo": "allow"}  # contract 2.5
+              "pseudo_text_legible": "fail", "pasted_photo": "fail", "pseudo_text": "record",
+              "venue_background": "record", "composited_logo": "allow"}  # contract 2.5
+GRAPHIC_ID_RE = re.compile(r"GR\d+")
+GRAPHIC_AREAS = ("top", "bottom", "left", "right")   # where a graphic keeps its artwork empty for the text
 _SET_ID_RE = re.compile(r"^[^\W_][\w-]{0,39}$")  # Unicode \w: non-Latin set names allowed
 _CONCEPT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,15}$")
 _LEGACY_SET = "_legacy"
@@ -642,6 +646,73 @@ def concept_of_path(project: Project, path: str) -> ConceptRef | None:
     return None
 
 
+# ---------- graphic folders (graphics/<GR>/, one per brief.json graphics entry) ----------
+
+class GraphicRef(NamedTuple):
+    key: str   # "graphics/GR1"
+    id: str    # "GR1"
+    dir: str   # absolute <root>/graphics/GR1 (may not exist yet)
+
+
+def graphic_item(brief: dict, gid: str) -> dict | None:
+    """The brief.json graphics entry with that id, or None."""
+    return next((g for g in graphics_of(brief) if g.get("id") == gid), None)
+
+
+def list_graphics(project: Project) -> list[GraphicRef]:
+    """Every graphic folder on disk (holds graphic.md or renders/) under graphics/<GR number>/, by number."""
+    base = project.path(GRAPHICS_FOLDER)
+    out = []
+    for n in _subdirs(base):
+        if not GRAPHIC_ID_RE.fullmatch(n):
+            continue
+        d = os.path.join(base, n)
+        if os.path.isfile(os.path.join(d, "graphic.md")) or os.path.isdir(os.path.join(d, "renders")):
+            out.append(GraphicRef(f"{GRAPHICS_FOLDER}/{n}", n, d))
+    return sorted(out, key=lambda g: int(g.id[2:]))
+
+
+def graphic_ref(project: Project, gid: str) -> GraphicRef:
+    """The graphic with that id; it must be listed in brief.json graphics (the folder may not exist yet)."""
+    if not GRAPHIC_ID_RE.fullmatch(gid) or graphic_item(project.brief, gid) is None:
+        raise InputError("C-INPUT", "brief/brief.json graphics",
+                         f"no graphic {gid} in brief.json graphics; add it and run gates.py brief")
+    return GraphicRef(f"{GRAPHICS_FOLDER}/{gid}", gid, project.path(GRAPHICS_FOLDER, gid))
+
+
+def graphic_of_path(project: Project, path: str) -> GraphicRef | None:
+    """The graphic folder a path lies in (listed in brief.json or not), else None."""
+    base = project.path(GRAPHICS_FOLDER)
+    for n in _subdirs(base):
+        if GRAPHIC_ID_RE.fullmatch(n) and inside(os.path.join(base, n), path):
+            return GraphicRef(f"{GRAPHICS_FOLDER}/{n}", n, os.path.join(base, n))
+    return None
+
+
+def owner_of_path(project: Project, path: str):
+    """The concept or graphic a path lies in, else None."""
+    return concept_of_path(project, path) or graphic_of_path(project, path)
+
+
+def is_graphic(owner) -> bool:
+    return isinstance(owner, GraphicRef)
+
+
+def owner_md(owner) -> tuple[str, str]:
+    """(absolute path, path as shown) of the concept.md or graphic.md of a concept or a graphic."""
+    if is_graphic(owner):
+        return os.path.join(owner.dir, "graphic.md"), f"{GRAPHICS_FOLDER}/{owner.id}/graphic.md"
+    return os.path.join(owner.dir, "concept.md"), f"concepts/{owner.set}/{owner.id}/concept.md"
+
+
+def ratio_value(ratio) -> float | None:
+    """Width divided by height of an "a:b" ratio string (a and b above 0); None for anything else."""
+    m = re.fullmatch(r"(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)", ratio) if isinstance(ratio, str) else None
+    if not m or float(m.group(1)) <= 0 or float(m.group(2)) <= 0:
+        return None
+    return float(m.group(1)) / float(m.group(2))
+
+
 # ---------- reference sets (contract 1, 1.2) ----------
 
 def _images_in(folder: str) -> list[str]:
@@ -755,12 +826,12 @@ def parse_front_matter(text: str) -> tuple[dict, str, list[Finding]]:
     return result, body, findings
 
 
-def read_front_matter(concept: ConceptRef) -> tuple[dict, list[Finding]]:
-    """Front matter of a concept's concept.md, with chosen/blocked paths checked (inside renders/, existing)."""
-    md = os.path.join(concept.dir, "concept.md")
+def read_front_matter(concept) -> tuple[dict, list[Finding]]:
+    """Front matter of the concept.md of a concept or the graphic.md of a graphic, with chosen/blocked paths
+    checked (inside the owner's renders/, existing)."""
+    md, prefix = owner_md(concept)
     if not os.path.isfile(md):
         return {"chosen": None, "blocked": [], "accent": None}, []
-    prefix = f"concepts/{concept.set}/{concept.id}/concept.md"
     try:
         with open(md, encoding="utf-8-sig") as f:
             text = f.read()
@@ -775,7 +846,7 @@ def read_front_matter(concept: ConceptRef) -> tuple[dict, list[Finding]]:
         full = os.path.normpath(os.path.join(concept.dir, p.replace("\\", "/")))
         return inside(renders, full) and os.path.isfile(full)
 
-    msg = "path must name an existing file inside this concept's renders/"
+    msg = f"path must name an existing file inside this {'graphic' if is_graphic(concept) else 'concept'}'s renders/"
     if result["chosen"] is not None:
         if path_ok(result["chosen"]):
             result["chosen"] = result["chosen"].replace("\\", "/")
@@ -929,7 +1000,7 @@ def forbidden_hashes(project: Project) -> dict[str, str]:
     for folder in (("input",), ("brief", "media")):
         for p in _files_under(project.path(*folder)):
             add(_hash_or_none(p), project.rel(p))
-    for c in list_concepts(project):
+    for c in list_concepts(project) + list_graphics(project):
         renders = os.path.join(c.dir, "renders")
         try:
             names = sorted(os.listdir(renders))
@@ -964,6 +1035,8 @@ def forbidden_hashes(project: Project) -> dict[str, str]:
 
 _CHAIN_MAX = 20
 _BASE_MODES = ("fix", "front", "logo", "label")
+_ROOT_MODES = {False: ("hero", "import"), True: ("graphic", "import")}       # key: is_graphic(owner)
+_BASE_MODES_OF = {False: _BASE_MODES, True: ("fix", "logo", "label")}
 
 
 def trace_base_chain(project: Project, image: str) -> tuple[list[str], Finding | None]:
@@ -975,9 +1048,10 @@ def trace_base_chain(project: Project, image: str) -> tuple[list[str], Finding |
     def fail(msg: str):
         return visited, Finding("R-SOURCE", "error", where, msg)
 
-    c = concept_of_path(project, image)
+    c = owner_of_path(project, image)
     if c is None:
         return fail("chain: not a render of any concept")
+    graphic = is_graphic(c)
     renders = real(os.path.join(c.dir, "renders"))
     forbidden = forbidden_hashes(project)
     seen: set[str] = set()
@@ -999,16 +1073,20 @@ def trace_base_chain(project: Project, image: str) -> tuple[list[str], Finding |
         if ver == 0:
             return fail(f"chain: {rel} has no sidecar")
         if ver == 1:
+            if graphic:
+                return fail(f"chain: {rel} has an old sidecar; graphics need sidecar/2")
             return visited, None
         outputs = sc.get("outputs")
         if not isinstance(outputs, dict) or outputs.get(os.path.basename(cur)) != h:
             return fail(f"chain: sidecar hash differs from {rel}")
+        if (sc.get("kind") == "graphic") != graphic:
+            return fail(f"chain: {rel} is not a {'graphic' if graphic else 'concept'} render (sidecar kind)")
         inputs = sc.get("inputs") if isinstance(sc.get("inputs"), list) else []
         bases = [i for i in inputs if isinstance(i, dict) and i.get("role") == "base"]
         mode = sc.get("mode")
-        if mode in ("hero", "import") and not bases:
+        if mode in _ROOT_MODES[graphic] and not bases:
             return visited, None
-        if mode in _BASE_MODES and len(bases) == 1 and isinstance(bases[0].get("path"), str):
+        if mode in _BASE_MODES_OF[graphic] and len(bases) == 1 and isinstance(bases[0].get("path"), str):
             base = os.path.join(project.root, bases[0]["path"])
             if _hash_or_none(base) != bases[0].get("sha256"):
                 return fail(f"chain: {bases[0]['path']} changed after {rel} was made")

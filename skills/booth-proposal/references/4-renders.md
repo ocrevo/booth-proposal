@@ -186,6 +186,15 @@ python scripts/render.py import FILE --concept set-1/A --ref input/refs/set-1/r0
 
 Meanwhile keep the prompts in `prompts/hero.txt`, give the user the `--dry-run` lines and the photos to attach, and bring in images made elsewhere with `render.py import`. With no render at all there is nothing to select: `start` ends after this step with the prompt files, the dry-run lines and the import instructions (SKILL.md, `## Start and step mode`).
 
+## Graphic prompts
+
+A graphic of `brief.json graphics` is drawn with `render.py graphic --graphic GR1 --prompt FILE --area top`; the prompt has a Graphic line, Brand colours, a Composition block that says where the empty text area is, a Subject block and these fixed sentences, copied exactly:
+
+No text, letters, numbers, logos, emblems, signatures or watermarks anywhere in the artwork; any label, screen, sign or package in it is plain.
+The empty area for the text stays calm and plain, free of objects, patterns and fine detail, and the subject never reaches into it.
+
+The attached photos show the product only for its shape, proportions, materials and colours; redraw it in the style of this artwork, never paste or trace the photo, and leave out every label, logo and lettering on it.
+
 ## Defaults
 
 `render.py hero` and `fix` use model `gpt-image-2`, size `1536x1024` and quality `high` (`--model`, `--size`, `--quality` override them). The key is read from the environment variable `OPENAI_API_KEY`, else from a line `OPENAI_API_KEY=` or `openai_key=` (any case) in a `.env` file (`## Without a key`).

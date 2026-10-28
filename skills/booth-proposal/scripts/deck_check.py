@@ -195,6 +195,7 @@ class ImageInfo(NamedTuple):
     kind: str | None                       # "render" | "plan" | "logo" | "site" | "graphic" | None
     concept: "common.ConceptRef | None"
     problems: list                         # (code, level, message), independent of where the image is placed
+    graphic: "common.GraphicRef | None" = None
 
 
 def _short(url, n=60):
@@ -295,11 +296,11 @@ class Images:
         def forbid(msg):
             problems.append(("D-IMG-FORBIDDEN", "error", msg))
 
-        def info(kind, concept=None):
+        def info(kind, concept=None, graphic=None):
             if kind is not None and kind not in self.allowed:
                 forbid(f"kind: {rel} is a {kind} image; the {self.arch['id']} architecture allows "
                        + ", ".join(self.arch["allowed_kinds"]))
-            return ImageInfo(shown, full, rel, sha, kind, concept, problems)
+            return ImageInfo(shown, full, rel, sha, kind, concept, problems, graphic)
 
         if rp == self._logo_real or common.inside(project.path("brief", "brand"), full):
             if sha in self.reference_hashes:
@@ -308,10 +309,14 @@ class Images:
         if sha in self.forbidden:
             forbid(f"forbidden: same content as {self.forbidden[sha]}")
             return info(None)
-        c = common.concept_of_path(project, full)
         base = os.path.basename(full).lower()
         ext = os.path.splitext(base)[1]
         folder = os.path.dirname(rp)
+        g = common.graphic_of_path(project, full)
+        if g is not None and folder == common.real(os.path.join(g.dir, "renders")) and ext in common._IMAGE_EXTS:
+            self._graphic_problems(g, full, rp, sha, rel, problems)
+            return info("graphic", graphic=g)
+        c = common.concept_of_path(project, full)
         if c is not None and folder == common.real(os.path.join(c.dir, "renders")) and ext in common._IMAGE_EXTS:
             self._render_problems(c, full, rp, sha, rel, problems)
             return info("render", c)
@@ -367,6 +372,46 @@ class Images:
             bad(f"not-chosen: {rel} is not the chosen render in concept.md{more}")
         if any(common.real(os.path.join(c.dir, b)) == rp for b in fm.get("blocked") or []):
             bad(f"blocked: concept.md lists {rel} under blocked")
+
+    def _graphic_problems(self, g, full, rp, sha, rel, problems):
+        project = self.project
+
+        def bad(msg):
+            problems.append(("D-IMG-RENDER", "error", msg))
+
+        sc = common.read_sidecar(full)
+        version = common.sidecar_version(sc)
+        if version != 2:
+            bad(f"sidecar: {rel} has no sidecar/2; make it with render.py graphic or render.py import --graphic")
+        else:
+            outputs = sc.get("outputs")
+            if not isinstance(outputs, dict) or outputs.get(os.path.basename(full)) != sha:
+                bad(f"sidecar: the sidecar hash differs from {rel}; the image changed after it was made")
+            else:
+                if sc.get("kind") != "graphic" or sc.get("graphic") != g.id:
+                    bad(f"kind: {rel} has no graphic sidecar for {g.id}")
+                if sc.get("mode") == "label":
+                    problems.append(("D-IMG-FORBIDDEN", "error",
+                                     "label: a labelled copy (render.py label) is never used in the deck"))
+                _, finding = common.trace_base_chain(project, full)
+                if finding is not None:
+                    bad(finding.message)
+        ok, why = common.review_is_current_pass(full, True)
+        if not ok:
+            bad(f"review: {why}")
+        item = common.graphic_item(project.brief, g.id)
+        if item is None:
+            bad(f"unlisted: {g.id} is not in brief.json graphics")
+        elif version == 2 and sc.get("ratio") != item.get("ratio"):
+            bad(f"stale: {rel} was made for ratio {sc.get('ratio')} but brief.json gives {item.get('ratio')}; "
+                "make the graphic again")
+        fm, fm_findings = common.read_front_matter(g)
+        chosen = fm.get("chosen")
+        if chosen is None or common.real(os.path.join(g.dir, chosen)) != rp:
+            more = "; graphic.md front matter is invalid" if any(f.code == "G-FM" for f in fm_findings) else ""
+            bad(f"not-chosen: {rel} is not the chosen render in graphic.md{more}")
+        if any(common.real(os.path.join(g.dir, b)) == rp for b in fm.get("blocked") or []):
+            bad(f"blocked: graphic.md lists {rel} under blocked")
 
     def _plan_problems(self, c, full, sha, problems):
         sc = common.read_sidecar(full)
@@ -457,7 +502,7 @@ class _Vocab:
         for _, _, names in os.walk(project.path("input")):
             files.update(names)
         self.layout_names = set()                  # names the project has below its folders (a path tail may be one)
-        for folder in ("input", "brief", "concepts", "pack", "work"):
+        for folder in ("input", "brief", "concepts", "pack", "work", common.GRAPHICS_FOLDER):
             for n, (_, dirs, names) in enumerate(os.walk(project.path(folder))):
                 self.layout_names.update(x.lower() for x in dirs + names)
                 if n > 400:
@@ -559,6 +604,58 @@ def _int(v):
 
 def _num(v):
     return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+# The text colour (a deck token) that the template sets over the artwork for each data-tone of figure.graphic.
+GRAPHIC_TONES = {"dark": "--ink-strong", "light": "--paper"}
+GRAPHIC_AREA_SHARE = {"top": 0.38, "bottom": 0.38, "left": 0.44, "right": 0.44}   # as .gtext in the template
+
+
+def reserved_mean(path, area, ratio):
+    """Mean (r, g, b) of the area of the image that the text goes over, after the deck crop to ratio ("a:b",
+    centred, as object-fit cover); None when the image cannot be read."""
+    from PIL import Image, ImageStat
+    try:
+        with Image.open(path) as im:
+            im = im.convert("RGB")
+            w, h = im.size
+            want = common.ratio_value(ratio)
+            if want and w and h:
+                if w / h > want:
+                    cw = round(h * want)
+                    im = im.crop(((w - cw) // 2, 0, (w - cw) // 2 + cw, h))
+                else:
+                    ch = round(w / want)
+                    im = im.crop((0, (h - ch) // 2, w, (h - ch) // 2 + ch))
+            w, h = im.size
+            share = GRAPHIC_AREA_SHARE[area]
+            box = {"top": (0, 0, w, round(h * share)), "bottom": (0, h - round(h * share), w, h),
+                   "left": (0, 0, round(w * share), h), "right": (w - round(w * share), 0, w, h)}[area]
+            return tuple(ImageStat.Stat(im.crop(box)).mean)
+    except (OSError, ValueError):
+        return None
+
+
+def _legibility(slide_add, n, info, area, tone, ratio, tokens):
+    """D-LAYOUT legibility warning when the text colour of the tone is hard to read on the reserved area."""
+    mean = reserved_mean(info.path, area, ratio) if info.path else None
+    if mean is None:
+        return
+    seen = {}
+    for name, var in GRAPHIC_TONES.items():
+        fg = common.hex_rgb(css_unquote(tokens.get(var, "")))
+        if fg is None:
+            return
+        seen[name] = common.contrast(fg[:3], mean)
+    if seen[tone] >= common.LEGIBLE_RATIO:
+        return
+    other = next(t for t in GRAPHIC_TONES if t != tone)
+    if seen[other] >= common.LEGIBLE_RATIO:
+        hint = f"use data-tone {other} instead ({seen[other]:.1f}:1)"
+    else:
+        hint = f"neither tone reaches it ({other} gives {seen[other]:.1f}:1); make the {area} area calmer or lighter"
+    slide_add("D-LAYOUT", "warn", n, f"legibility: the text over {info.rel} reads {seen[tone]:.1f}:1 against the "
+                                     f"{area} area with data-tone {tone} (least {common.LEGIBLE_RATIO:g}); {hint}")
 
 
 def run_check(project, deck_text=None, render_json=True) -> CheckResult:
@@ -781,6 +878,52 @@ def run_check(project, deck_text=None, render_json=True) -> CheckResult:
             slide_add("D-PLACE", "error", n, f"figure: the render {info.rel} must be an img inside figure.render")
         if role in ("materials", "interaction") and not (in_render and fig.has_class("annotated")):
             slide_add("D-PLACE", "error", n, f"hero: a render on the {role} page must sit in figure.render.annotated")
+    graphic_pages = set()                       # graphics that a page with data-role graphic shows
+    tm = deck_html.TOKENS_RE.search(deck_text)
+    deck_tokens = {**deck_html.NEUTRAL_TOKENS, **(deck_html.parse_vars(tm.group(2)) if tm else {})}
+    for loc, node, info in uses:
+        if info.kind != "graphic" or loc is None or id(node) in placed:
+            continue
+        placed.add(id(node))
+        n, pid, role = loc
+        fig = next((a for a in node.ancestors() if a.tag == "figure"), None)
+        in_graphic = fig is not None and fig.has_class("graphic")
+        if node.tag != "img" or not in_graphic:
+            slide_add("D-PLACE", "error", n, f"figure: the graphic {info.rel} must be an img inside figure.graphic")
+        if role != "graphic":
+            slide_add("D-PLACE", "error", n, f"role: the graphic {info.rel} goes on a page with data-role graphic")
+        else:
+            graphic_pages.add(info.graphic.id)
+        if not in_graphic:
+            continue
+        sc = common.read_sidecar(info.path)
+        area = sc.get("area") if common.sidecar_version(sc) == 2 else None
+        got = got_area = (fig.get("data-area") or "").strip()
+        if isinstance(area, str) and area and got != area:
+            slide_add("D-PLACE", "error", n, f"area: figure.graphic data-area '{got}' but {info.rel} keeps the "
+                                             f"{area} empty for the text (render.py graphic --area)")
+        item = common.graphic_item(project.brief, info.graphic.id)
+        got = (fig.get("data-ratio") or "").strip()
+        if item is not None and got != item.get("ratio"):
+            slide_add("D-PLACE", "error", n, f"ratio: figure.graphic data-ratio '{got}' differs from the brief.json "
+                                             f"ratio {item.get('ratio')} of {info.graphic.id}")
+        tone = (fig.get("data-tone") or "dark").strip()
+        if tone not in GRAPHIC_TONES:
+            slide_add("D-STRUCT", "error", n, f"tone: figure.graphic data-tone '{tone}' must be one of "
+                                              f"{', '.join(GRAPHIC_TONES)}")
+        elif got_area in common.GRAPHIC_AREAS:
+            _legibility(slide_add, n, info, got_area, tone, (fig.get("data-ratio") or "").strip(), deck_tokens)
+    for n, s in enumerate(slides, 1):
+        if s.get("data-role") == "graphic" and not any(
+                i.kind == "graphic" and loc is not None and loc[0] == n for loc, _, i in uses):
+            slide_add("D-STRUCT", "error", n, "graphic: a graphic page shows no graphic render "
+                                              "(figure.graphic with the chosen render)")
+    if "graphic" in images.allowed:
+        for item in common.graphics_of(project.brief):
+            gid = item.get("id")
+            if isinstance(gid, str) and gid not in graphic_pages:
+                add("D-STRUCT", "error", "deck", f"graphic: {gid} of brief.json has no page; add one with "
+                                                 f"deck.py layouts --emit graphic --graphic {gid}")
     lead = (sel or {}).get("lead")
     pages_of = {}
     for loc, node, info in uses:

@@ -2,7 +2,8 @@
 
   new      shell with head, style#tokens, style#design, viewer and the skeleton pages of the architecture (--template, --force)
   style    rewrite only style#tokens from brief/deck-style.json and the labels (--template)
-  layouts  catalogue of the template; --emit LAYOUT[:VARIANT] [--count N] [--chapter ID] prints a fragment to paste
+  layouts  catalogue of the template; --emit LAYOUT[:VARIANT] [--count N] [--chapter ID] [--graphic GR] prints a
+           fragment to paste (--graphic: the graphic layout, filled with the chosen render, ratio and area of GR)
   check    read-only check of the deck (--json writes work/check.json)
   render   refresh page references, draft PDF, previews, contact sheet, overflow and upscale (work/)
   text     page text blocks, data-auto text marked [auto] (--diff: pages changed since the recorded review)
@@ -36,6 +37,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--emit", metavar="LAYOUT[:VARIANT]", help="print the HTML fragment of this example")
     p.add_argument("--count", type=int, help="repeat the repeat unit N times (needs --emit)")
     p.add_argument("--chapter", metavar="ID", help="set data-chapter on the fragment (needs --emit)")
+    p.add_argument("--graphic", metavar="GR", help="fill the graphic layout with this graphic of brief.json "
+                                                   "(needs --emit graphic[:wide])")
     p = sub.add_parser("check", parents=[base], help="check the deck; read-only")
     p.add_argument("--json", action="store_true",
                    help="print the findings as JSON instead of the text report, then write work/check.json")
@@ -66,6 +69,8 @@ def main(argv=None) -> int:
             ap.error("--count must be at least 1")
         if args.chapter is not None and args.emit is None:
             ap.error("--chapter needs --emit")
+        if args.graphic is not None and (args.emit is None or args.emit.partition(":")[0] != "graphic"):
+            ap.error("--graphic needs --emit graphic or --emit graphic:wide")
     try:
         project = common.find_project(args.project)
         if args.cmd == "new":
@@ -73,7 +78,7 @@ def main(argv=None) -> int:
         if args.cmd == "style":
             return deck_html.cmd_style(project, args.template)
         if args.cmd == "layouts":
-            return deck_html.cmd_layouts(project, args.emit, args.count, args.chapter)
+            return deck_html.cmd_layouts(project, args.emit, args.count, args.chapter, args.graphic)
         if args.cmd == "check":
             return deck_check.cmd_check(project, args.json)
         if args.cmd == "render":

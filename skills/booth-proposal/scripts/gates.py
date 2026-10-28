@@ -1,7 +1,7 @@
 """Gates for the early steps of a booth proposal project.
 
-Commands: brief [--stamp], frame, ideas [--scaffold], select, renders, concepts, architectures [--json],
-report brief|ideas|renders|concepts.
+Commands: brief [--stamp], frame, ideas [--scaffold], select, renders [--concept KEY ...] [--graphic ID ...],
+concepts, architectures [--json], report brief|ideas|renders|concepts.
 Every command takes --project (default "."), written after the command name.
 Exit codes: 0 done, 1 at least one error finding, 2 bad invocation or unusable input.
 Messages are English and start with the rule name ("stale: ..."); only `report` prints text in
@@ -19,16 +19,18 @@ import os
 import re
 import sys
 
-from common import (CLAUSE_KINDS, CLAUSE_N_RE, DEFAULTS, Finding, InputError, _CONCEPT_ID_RE, _LEGACY_SET,
-                    _SET_ID_RE, _images_in, architecture_choice, clauses_of, concept_ref, deliverables_of,
-                    find_project, inside, kinds_of, list_concepts, load_architectures, load_labels, now_iso,
-                    print_findings, read_front_matter, read_json, read_review, read_sidecar, real, required_chapters, review_is_current_pass, scan_reference_sets,
+from common import (CLAUSE_KINDS, CLAUSE_N_RE, DEFAULTS, GRAPHIC_ID_RE, GRAPHICS_FOLDER, Finding, GraphicRef, InputError,
+                    _CONCEPT_ID_RE, _LEGACY_SET, _SET_ID_RE, _images_in, architecture_choice, clauses_of,
+                    concept_ref, deliverables_of, find_project, graphic_item, graphic_ref, graphics_of, inside,
+                    is_graphic, kinds_of, list_concepts, list_graphics, load_architectures, load_labels, now_iso,
+                    owner_md, print_findings, read_front_matter, read_json, read_review, read_sidecar, real, required_chapters, review_is_current_pass, scan_reference_sets,
                     sha256_file, sidecar_version, to_m, trace_base_chain, write_json)
 
 _BRIEF = "brief/brief.json"
 _IDEAS = "brief/ideas.json"
 _SIDES = ("front", "back", "left", "right")
-_REPORT_KEYS = ("brief", "ideas", "renders", "concepts", "pass", "fail", "none", "cost_line")
+_REPORT_KEYS = ("brief", "ideas", "renders", "concepts", "pass", "fail", "none", "cost_line", "graphics",
+                "cost_graphics")
 
 
 # ---------- shared helpers ----------
@@ -628,16 +630,31 @@ def _chain_ref_hashes(project, chain: list[str]) -> list[tuple[str, str, str]]:
     return out
 
 
-def _concept_render_findings(project, c) -> list[Finding]:
-    """G-FM, G-RENDER, G-REVIEW, R-FIX-MAX and C-LEGACY for one concept folder."""
+def _graphic_ref_hashes(project, item: dict | None) -> set[str]:
+    """The current sha256 of every existing file in the refs of a brief.json graphics entry."""
+    out = set()
+    for r in (item or {}).get("refs") or []:
+        if isinstance(r, str):
+            try:
+                out.add(sha256_file(project.path(*r.split("/"))))
+            except OSError:
+                continue
+    return out
+
+
+def _owner_render_findings(project, c) -> list[Finding]:
+    """G-FM, G-RENDER, G-REVIEW, R-FIX-MAX and C-LEGACY for one concept folder or graphic folder."""
+    graphic = is_graphic(c)
+    noun = "graphic" if graphic else "concept"
     fm, fm_findings = read_front_matter(c)
     if fm_findings:
         return fm_findings
     if not _images_in(os.path.join(c.dir, "renders")):
         return []
-    md = f"concepts/{c.set}/{c.id}/concept.md"
+    md_path, md = owner_md(c)
+    md_name = os.path.basename(md_path)
     if fm["chosen"] is None:
-        return [Finding("G-RENDER", "error", md, "nochosen: the concept has renders but concept.md names no chosen one")]
+        return [Finding("G-RENDER", "error", md, f"nochosen: the {noun} has renders but {md_name} names no chosen one")]
     image = os.path.normpath(os.path.join(c.dir, fm["chosen"]))
     rel = project.rel(image)
     out: list[Finding] = []
@@ -646,7 +663,7 @@ def _concept_render_findings(project, c) -> list[Finding]:
         out.append(Finding(code, level, where, message))
 
     if real(image) in {real(os.path.join(c.dir, b)) for b in fm["blocked"]}:
-        add("G-RENDER", "error", "blocked: the chosen render is also listed as blocked in concept.md")
+        add("G-RENDER", "error", f"blocked: the chosen render is also listed as blocked in {md_name}")
     sc = read_sidecar(image)
     ver = sidecar_version(sc)
     outputs = sc.get("outputs") if ver == 2 else None
@@ -659,13 +676,18 @@ def _concept_render_findings(project, c) -> list[Finding]:
         if finding is not None:
             out.append(finding._replace(code="G-RENDER"))
         else:
-            own = _own_set_hashes(project, c.set)
+            own = _graphic_ref_hashes(project, graphic_item(project.brief, c.id)) if graphic \
+                else _own_set_hashes(project, c.set)
             seen: set = set()
             for step, path, digest in _chain_ref_hashes(project, chain):
                 if digest not in own and digest not in seen:
                     seen.add(digest)
-                    add("G-RENDER", "error",
-                        f"refset: reference input {path or digest[:12]} is not a photo of set {c.set}", step)
+                    if graphic:
+                        add("G-RENDER", "error", f"refs: reference input {path or digest[:12]} is not a file of the "
+                                                 f"refs of {c.id} in brief.json", step)
+                    else:
+                        add("G-RENDER", "error",
+                            f"refset: reference input {path or digest[:12]} is not a photo of set {c.set}", step)
             fixes = sum(1 for step in chain if (read_sidecar(project.path(step)) or {}).get("mode") == "fix")
             fix_max = project.thresholds["fix_max"]
             if fixes > fix_max:
@@ -679,12 +701,43 @@ def _concept_render_findings(project, c) -> list[Finding]:
     return out
 
 
+def _graphic_ids(project) -> list[str]:
+    """The graphic ids of brief.json graphics and of the folders on disk, by number."""
+    ids = {g["id"] for g in graphics_of(project.brief) if isinstance(g.get("id"), str) and GRAPHIC_ID_RE.fullmatch(g["id"])}
+    ids |= {g.id for g in list_graphics(project)}
+    return sorted(ids, key=lambda i: int(i[2:]))
+
+
+def _graphic_findings(project, gid: str) -> list[Finding]:
+    """G-RENDER unlisted | missing, then the render findings of one graphic."""
+    if graphic_item(project.brief, gid) is None:
+        return [Finding("G-RENDER", "error", f"{GRAPHICS_FOLDER}/{gid}",
+                        f"unlisted: {GRAPHICS_FOLDER}/{gid} is not in brief.json graphics")]
+    g = graphic_ref(project, gid)
+    if not _images_in(os.path.join(g.dir, "renders")):
+        arch = project.architecture
+        if arch is not None and "graphic" in arch["allowed_kinds"]:
+            return [Finding("G-RENDER", "warn", _BRIEF + " graphics",
+                            f"missing: {gid} has no renders yet; run render.py graphic --graphic {gid} "
+                            f"(or render.py import --graphic {gid})")]
+        return []
+    return _owner_render_findings(project, g)
+
+
 def cmd_renders(project, args) -> int:
     keys = list(dict.fromkeys(k for group in (args.concept or []) for k in group))
-    concepts = [concept_ref(project, k) for k in keys] if keys else list_concepts(project)
+    gids = list(dict.fromkeys(i for group in (args.graphic or []) for i in group))
+    for gid in gids:
+        graphic_ref(project, gid)                      # an id that brief.json does not list is C-INPUT
+    if keys or gids:
+        concepts = [concept_ref(project, k) for k in keys]
+    else:
+        concepts, gids = list_concepts(project), _graphic_ids(project)
     findings = _reference_findings(project, *scan_reference_sets(project))
     for c in concepts:
-        findings += _concept_render_findings(project, c)
+        findings += _owner_render_findings(project, c)
+    for gid in gids:
+        findings += _graphic_findings(project, gid)
     return print_findings(findings, args.json)
 
 
@@ -837,8 +890,33 @@ def _report_ideas(project, L: dict) -> list[str]:
         lines += _table(["id", "name", "idea", "booth_type", "chosen"], rows, none)
     per = project.thresholds["candidates_per_concept"]
     minutes = math.ceil(chosen * per * project.thresholds["seconds_per_image"] / 60)
-    lines += ["", L["cost_line"].format(concepts=chosen, per=per, images=chosen * per, minutes=minutes)]
+    cost_line = (L.get("cost_line_one") if chosen == 1 else None) or L["cost_line"]    # *_one: singular, optional
+    lines += ["", cost_line.format(concepts=chosen, per=per, images=chosen * per, minutes=minutes)]
+    n = len(graphics_of(project.brief))
+    if n and project.architecture is not None and "graphic" in project.architecture["allowed_kinds"]:
+        seconds = project.thresholds["seconds_per_image"]
+        cost_graphics = (L.get("cost_graphics_one") if n == 1 else None) or L["cost_graphics"]
+        lines += ["", cost_graphics.format(graphics=n, per=per, images=n * per,
+                                                minutes=math.ceil(n * per * seconds / 60))]
     return lines
+
+
+def _render_rows(owner, label: str, L: dict, render) -> list[dict]:
+    """One row per image of a concept or graphic: its candidates plus the chosen render when that is not one."""
+    fm, _ = read_front_matter(owner)
+    chosen = real(os.path.join(owner.dir, fm["chosen"])) if fm["chosen"] else None
+    images = list(render.renders_of(owner))
+    if chosen is not None and os.path.isfile(chosen) and chosen not in [real(i) for i in images]:
+        images.append(chosen)      # a fix, front or logo output is not a candidate but can be chosen
+    rows = []
+    for img in images:
+        review = read_review(img)
+        verdict = L["none"]
+        if review is not None and review.get("sha256") == sha256_file(img):
+            verdict = L["pass" if review.get("verdict") == "pass" else "fail"] + f" ({review.get('scope')})"
+        rows.append({label: owner.id, "image": os.path.basename(img), "verdict": verdict,
+                     "chosen": "\u2713" if chosen is not None and real(img) == chosen else ""})
+    return rows
 
 
 def _report_renders(project, L: dict) -> list[str]:
@@ -851,24 +929,23 @@ def _report_renders(project, L: dict) -> list[str]:
     for sid, concepts in by_set.items():
         rows = []
         for c in concepts:
-            fm, _ = read_front_matter(c)
-            chosen = real(os.path.join(c.dir, fm["chosen"])) if fm["chosen"] else None
-            images = list(render.renders_of(c))
-            if chosen is not None and os.path.isfile(chosen) and chosen not in [real(i) for i in images]:
-                images.append(chosen)      # a fix, front or logo output is not a candidate but can be chosen
-            for img in images:
-                review = read_review(img)
-                verdict = none
-                if review is not None and review.get("sha256") == sha256_file(img):
-                    verdict = L["pass" if review.get("verdict") == "pass" else "fail"] + f" ({review.get('scope')})"
-                rows.append({"concept": c.id, "image": os.path.basename(img), "verdict": verdict,
-                             "chosen": "✓" if chosen is not None and real(img) == chosen else ""})
+            rows += _render_rows(c, "concept", L, render)
         lines += ["", f"## {_cell(sid)}", ""]
         lines += _table(["concept", "image", "verdict", "chosen"], rows, none)
         sheets = [project.rel(p) for p in (project.path("work", "sheets", f"{sid}-candidates.png"),
                                            project.path("work", "sheets", f"{sid}-chosen.png"))
                   if os.path.isfile(p)]
         lines += [""] + ([f"- {p}" for p in sheets] if sheets else [none])
+    ids = _graphic_ids(project)
+    if ids:
+        rows = []
+        for gid in ids:
+            rows += _render_rows(GraphicRef(f"{GRAPHICS_FOLDER}/{gid}", gid, project.path(GRAPHICS_FOLDER, gid)),
+                                 "graphic", L, render)
+        lines += ["", f"## {L['graphics']}", ""]
+        lines += _table(["graphic", "image", "verdict", "chosen"], rows, none)
+        sheet = project.rel(project.path("work", "sheets", "graphics.png"))
+        lines += [""] + ([f"- {sheet}"] if os.path.isfile(project.path("work", "sheets", "graphics.png")) else [none])
     return lines
 
 
@@ -981,9 +1058,11 @@ def _build_parser():
     sel.add_argument("--show", action="store_true", help="print brief/selection.json")
     sel.add_argument("--clear", action="store_true", help="delete brief/selection.json")
 
-    p = sub.add_parser("renders", parents=[common], help="check the chosen render of each concept")
+    p = sub.add_parser("renders", parents=[common], help="check the chosen render of each concept and graphic")
     p.add_argument("--concept", action="append", nargs="+", metavar="KEY",
                    help="only these concepts (<set>/<concept>)")
+    p.add_argument("--graphic", action="append", nargs="+", metavar="ID",
+                   help="only these graphics (ids of brief.json graphics)")
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("concepts", parents=[common], help="check geometry and plan of the selected concepts")
