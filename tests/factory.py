@@ -57,9 +57,23 @@ CLAUSES = [
 ]
 
 
-def brief_dict(lang="en", arch=None) -> dict:
+# the "rich" tender brief: one mixed clause (design and execution) and the unnumbered submission items
+MIXED_CLAUSE = {"n": "9", "text": "Furniture of the lounge and its delivery", "title": "Lounge furniture delivery",
+                "source": "Tender p.4 item 9", "kind": ["design", "execution"], "points": []}
+DELIVERABLES = [
+    {"id": "DL1", "title": "Design scheme", "kind": "design", "points": ["D1", "D2"], "source": "Tender p.5 list"},
+    {"id": "DL2", "title": "Graphic designs", "kind": "graphics", "points": [], "source": "Tender p.5 list"},
+    {"id": "DL3", "title": "Schedule and headcount", "kind": "execution", "points": [], "source": "Tender p.5 list"},
+    {"id": "DL4", "title": "Itemised price", "kind": "price", "points": [], "source": "Tender p.5 list"},
+]
+
+
+def brief_dict(lang="en", arch=None, rich=False) -> dict:
     out = _brief_base(lang)
     out["clauses"] = copy.deepcopy(CLAUSES)
+    if rich:
+        out["clauses"].append(copy.deepcopy(MIXED_CLAUSE))
+        out["deliverables"] = copy.deepcopy(DELIVERABLES)
     if arch is not None:
         out["proposal"] = {"architecture": arch}
     return out
@@ -233,7 +247,7 @@ def add_render(root, key: str, name: str, *, mode: str = "hero", base: str | Non
 
 
 def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaffold=True,
-                  renders=True, chosen=True, style=None, arch=None) -> Path:
+                  renders=True, chosen=True, style=None, arch=None, rich=False) -> Path:
     root = Path(root)
     if root.exists() and any(root.iterdir()):
         raise ValueError(f"{root} is not empty")
@@ -243,7 +257,7 @@ def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaf
         raise ValueError("scaffold needs ideas=True")
     root.mkdir(parents=True, exist_ok=True)
 
-    common.write_json(str(root / "brief" / "brief.json"), brief_dict(lang, arch))
+    common.write_json(str(root / "brief" / "brief.json"), brief_dict(lang, arch, rich))
     if style is not None:
         common.write_json(str(root / "brief" / "deck-style.json"), style)
 
@@ -357,12 +371,12 @@ def _emit(root, spec: str, count: int | None = None) -> str:
     return out.getvalue()
 
 
-def _deck_base(root: Path, lang: str, arch: str):
+def _deck_base(root: Path, lang: str, arch: str, rich: bool = False):
     """The project of the deck fixtures up to the new deck: build_project, reviewed chosen renders, selection,
     geometry and plans, then deck.py new. Returns (render_of, plan_of)."""
     import deck
     import draw_plan
-    build_project(root, lang=lang, style={"logo": "brand/logo.png"}, arch=arch)
+    build_project(root, lang=lang, style={"logo": "brand/logo.png"}, arch=arch, rich=rich)
     brief = common.read_json(str(root / "brief" / "brief.json"))
     brief["protected_terms"].append("Tidewater C1")
     common.write_json(str(root / "brief" / "brief.json"), brief)
@@ -425,9 +439,9 @@ def _write_deck_pages(root: Path, pages: list) -> None:
     h.write_deck(project, tree.html())
 
 
-def _build_deck_project(root: Path, lang: str, arch: str = "showcase") -> None:
+def _build_deck_project(root: Path, lang: str, arch: str = "showcase", rich: bool = False) -> None:
     import deck_html as h
-    render_of, plan_of = _deck_base(root, lang, arch)
+    render_of, plan_of = _deck_base(root, lang, arch, rich)
     text = (root / "pack" / "proposal.html").read_text(encoding="utf-8")
     slides = h.slides_of(h.parse(text))
     if arch == "showcase":
@@ -440,39 +454,55 @@ def _build_deck_project(root: Path, lang: str, arch: str = "showcase") -> None:
                  fill(sk["understanding"], {"sub": "Where the stand sits and what the tender asks"}),
                  fill(sk["design"], {"sub": "Two concepts answering the tender point by point"})]
         pages += _body_pages(root, render_of, plan_of)
-        pages += [fill(sk["interaction"], {"sub": "How visitors try the Tidewater Pass app"}), sk["separate"]]
-        table = h.element(sk["appendix"])
+        pages.append(fill(sk["interaction"], {"sub": "How visitors try the Tidewater Pass app"}))
+        if rich:
+            pages.append(fill(sk["graphics"], {"sub": "The graphic design direction for the stand"}))
+        pages.append(sk["separate"])
+        brief = common.read_json(str(root / "brief" / "brief.json"))
+        clauses = common.clauses_of(brief)
+        targets = {"2": ["a-board"], "5": ["interaction"], "7": ["separate"], "8.1": ["separate"],
+                   "9": ["a-board", "separate"]}
+        entries = [("data-clause", c["n"], c["n"], c["text"], targets[c["n"]]) for c in clauses]
+        dl_targets = {"DL1": ["a-board"], "DL2": ["graphics"], "DL3": ["separate"], "DL4": ["separate"]}
+        entries += [("data-deliverable", d["id"], d["title"], d["title"], dl_targets[d["id"]])
+                    for d in common.deliverables_of(brief)]
+        if rich:                                    # more rows than the skeleton table has: emit the table by count
+            table = h.element(_emit(root, "table", len(entries)))
+            for k, v in (("data-id", "appendix"), ("data-chapter", "appendix"), ("data-part", "appendix")):
+                table.set(k, v)
+        else:
+            table = h.element(sk["appendix"])
         rows = [n for n in table.iter() if n.tag == "tr" and n.get("data-repeat") == "row"]
-        clauses = common.clauses_of(common.read_json(str(root / "brief" / "brief.json")))
-        targets = ("a-board", "interaction", "separate", "separate")
         texts = {"title": "Response to the tender", "col1": "Clause", "col2": "Our response", "col3": "Pages",
                  "foot": "Pages refer to this proposal"}
-        for k, (row, clause, target) in enumerate(zip(rows, clauses, targets), 1):
-            row.set("data-clause", clause["n"])
-            texts.update({f"r{k}-a": clause["n"], f"r{k}-b": clause["text"],
-                          f"r{k}-c": f'<span data-ref="{target}"></span>'})
+        for k, (row, (attr, key, a, b, refs)) in enumerate(zip(rows, entries), 1):
+            row.set(attr, key)
+            texts.update({f"r{k}-a": a, f"r{k}-b": b,
+                          f"r{k}-c": " ".join(f'<span data-ref="{t}"></span>' for t in refs)})
         pages.append(fill(table.html(), texts))
         pages.append(_claims_page(root))
     _write_deck_pages(root, pages)
 
 
-def deck_project(tmp_path, lang: str = "en", arch: str = "showcase") -> Path:
+def deck_project(tmp_path, lang: str = "en", arch: str = "showcase", rich: bool = False) -> Path:
     """tmp_path/deck-project (showcase) or tmp_path/deck-project-<arch>: build_project (with the logo in
     brief/brand), two selected concepts (set-2/B shown as A, set-1/A shown as B and lead), reviewed chosen
     renders, geometry and plans, and a deck. Showcase: eight slides (cover, a-board, a-plan, b-board, b-plan,
     b-annotated, compare, claims). Tender: cover, understanding, design, the six concept pages, interaction,
-    separate, the clause table, claims. Built once per (language, architecture) with the real commands and
-    copied for each caller."""
+    separate, the clause table, claims. rich (tender): the brief also has a mixed clause and four deliverables, so
+    the deck adds the graphics page and the table has nine rows. Built once per (language, architecture, rich)
+    with the real commands and copied for each caller."""
     import atexit
     import shutil
     import tempfile
-    key = (lang, arch)
+    key = (lang, arch, rich)
     if key not in _DECK_CACHE:
         base = Path(tempfile.mkdtemp(prefix="deck-project-"))
         atexit.register(shutil.rmtree, str(base), True)
-        _build_deck_project(base / "p", lang, arch)
+        _build_deck_project(base / "p", lang, arch, rich)
         _DECK_CACHE[key] = str(base / "p")
-    dest = Path(tmp_path) / ("deck-project" if arch == "showcase" else f"deck-project-{arch}")
+    name = "deck-project" if arch == "showcase" else f"deck-project-{arch}"
+    dest = Path(tmp_path) / (name + "-rich" if rich else name)
     shutil.copytree(_DECK_CACHE[key], dest)
     return dest
 

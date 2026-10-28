@@ -543,9 +543,14 @@ def slot_text(node) -> str:
     return " ".join("".join(out).split())
 
 
-def page_lines(slide) -> list:
+AUTO_MARK = "[auto] "
+
+
+def page_lines(slide, auto=False) -> list:
     """The page's content in document order: each leaf slot's text, [image] for an img outside the leaf slots and
-    [ref:<target>] for a data-ref element outside them. Empty lines are dropped."""
+    [ref:<target>] for a data-ref element outside them. With auto, a data-auto element outside the slots is a
+    line too, marked "[auto] " (text that comes from the labels or the brief, not from the writer). Empty lines
+    are dropped."""
     lines = []
 
     def walk(n):
@@ -556,6 +561,9 @@ def page_lines(slide) -> list:
                 lines.append(slot_text(c))
             elif c.get("data-ref") is not None:
                 lines.append(slot_text(c))
+            elif auto and c.get("data-auto") and not any(d.get("data-slot") is not None for d in c.iter()):
+                t = slot_text(c)
+                lines.append(AUTO_MARK + t if t else "")
             elif c.tag == "img":
                 lines.append("[image]")
             else:
@@ -564,8 +572,8 @@ def page_lines(slide) -> list:
     return [x for x in lines if x]
 
 
-def page_text(slide) -> str:
-    return "\n".join(page_lines(slide))
+def page_text(slide, auto=False) -> str:
+    return "\n".join(page_lines(slide, auto))
 
 
 _TYPO = ("b", "i", "em", "strong", "span", "sup", "sub")
@@ -801,7 +809,36 @@ def emit(ex, project, count=None) -> str:
             value = _dotted(project.labels, key)
             if value is not None:
                 n.set_text(value.replace("{}", _concept_letter(n)))
+    _fill_auto_lists(sec, project)
     return sec.html() + "\n"
+
+
+# data-auto keys whose elements are list items written from the brief: key -> f(project) -> [item text]
+AUTO_LISTS = {"separate.item": lambda project: common.separate_items(project.architecture, project.brief)}
+
+
+def _fill_auto_lists(sec, project) -> None:
+    """Replace each prototype list item (a data-auto key of AUTO_LISTS) by one item per text; with no text the
+    item goes, and so does a list left empty by it."""
+    for proto in [n for n in sec.iter() if n.get("data-auto") in AUTO_LISTS]:
+        texts = AUTO_LISTS[proto.get("data-auto")](project)
+        parent = proto.parent
+        if not texts:
+            proto.remove()
+            if parent is not None and parent is not sec and not any(c.is_el for c in parent.children):
+                parent.remove()
+            continue
+        gap = "\n"
+        i = parent.children.index(proto)
+        if i > 0 and parent.children[i - 1].tag == "#text" and not parent.children[i - 1].raw.strip():
+            gap = parent.children[i - 1].raw
+        proto.set_text(texts[0])
+        last = proto
+        for t in texts[1:]:
+            c = proto.clone()
+            c.set_text(t)
+            parent.insert_after(last, c, gap)
+            last = c
 
 
 def _report(e) -> int:

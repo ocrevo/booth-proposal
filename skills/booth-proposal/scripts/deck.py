@@ -5,7 +5,7 @@
   layouts  catalogue of the template; --emit LAYOUT[:VARIANT] [--count N] [--chapter ID] prints a fragment to paste
   check    read-only check of the deck (--json writes work/check.json)
   render   refresh page references, draft PDF, previews, contact sheet, overflow and upscale (work/)
-  text     page text blocks (--diff: pages changed since the recorded review)
+  text     page text blocks, data-auto text marked [auto] (--diff: pages changed since the recorded review)
   review   --record FILE validates and stamps a review into work/deck-review.json
   export   gate (check, render, review) then pack/proposal.pdf;  status  one-paragraph summary
 Every command takes --project (default: the current folder). Exit 0 done, 1 errors, 2 bad input, 3 external failure.

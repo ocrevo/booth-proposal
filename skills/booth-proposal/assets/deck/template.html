@@ -25,7 +25,9 @@
   - data-img      : "render", "plan" or "logo" on every img (informational: what belongs there).
                     Template images are data: placeholders; --emit empties src; deck paths are relative to pack/.
   - data-auto     : an element filled by --emit and new with the labels value at that dotted key
-                    ({} = the nearest data-concept letter).
+                    ({} = the nearest data-concept letter). data-auto="separate.item" marks the list items of the
+                    separate-submission page: --emit and new write one per item the brief submits separately.
+                    deck.py text prints every data-auto element as an [auto] line.
   - data-chapter  : the chapter a slide opens (an id of the project's architecture); a slide without it
                     continues the chapter before it. deck.py new writes it on the skeleton; --emit --chapter ID sets it.
   - Renders       : figure.render holding one img, stamped by CSS with --stamp.
@@ -242,6 +244,9 @@ figure.render::after{content:var(--stamp);position:absolute;right:14px;bottom:14
 .statement .say{font-size:var(--fs-statement);font-weight:300;line-height:1.42;letter-spacing:.01em;color:var(--ink-strong);max-width:1460px}
 .statement .say b,.statement .say strong{font-weight:700;color:var(--primary)}
 .statement .by{margin-top:56px;font-size:var(--fs-small);line-height:1.6;color:var(--muted-text);max-width:1010px}
+.statement.separate .say{font-size:var(--fs-title);line-height:1.35}
+.statement.separate .items{list-style:none;margin:var(--s6) 0 0;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s3) var(--g);max-width:1460px}
+.statement.separate .items li{padding:var(--s3) var(--s4);background:var(--surface);border-left:6px solid var(--accent);font-size:var(--fs-lead);line-height:1.4;color:var(--ink)}
 
 /* ---------- cards (n2 / n3 / n4 / n6) ---------- */
 /* the grid follows the lead and each card reads top down (number, then text): no band inside or above the cards */
@@ -590,12 +595,17 @@ html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
 
 <!-- ===================================================================
      STATEMENT · separate – the separate-submission page: the title and the fixed sentence come from the
-     labels (data-auto separate.title and separate.sentence); no slots, nothing to write, no figures
+     labels (data-auto separate.title and separate.sentence), then one list item per item the brief submits
+     separately (clause number and title, deliverable title; emitted from brief.json, one li is the prototype);
+     no slots, nothing to write, no other figures than the clause numbers
      =================================================================== -->
 <section class="slide statement separate" data-id="statement-separate" data-roles="text">
   <div class="body">
     <p class="tag label acc" data-auto="separate.title"></p>
     <p class="say" data-auto="separate.sentence"></p>
+    <ul class="items">
+      <li data-auto="separate.item"></li>
+    </ul>
   </div>
 </section>
 

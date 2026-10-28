@@ -28,7 +28,7 @@ CLAUSE_KINDS = ("design", "interaction", "graphics", "material", "hospitality", 
 IMAGE_KINDS = ("render", "plan", "logo", "site", "graphic")   # "graphic": classified from stage A2 on
 CLAUSE_N_RE = re.compile(r"\d{1,3}(?:\.\d{1,3}){0,3}[a-z]?")   # 2, 8.1, 4.2.1, 3a (use fullmatch)
 _ARCH_ID_RE = re.compile(r"[a-z][a-z0-9-]{0,31}")
-_REQUIRED = ("always", "never", "if-clause-kind", "if-graphics")
+_REQUIRED = ("always", "never", "if-kind")
 LEGIBLE_RATIO = 3.0  # least contrast ratio of text against its background (large-text level)
 PROJECT_FOLDERS = ("input", "refs", "brief", "concepts", "pack", "work", "renders", "prompts")  # project layout
 PLAIN_WORD_FOLDERS = ("input", "pack", "work")  # also ordinary words: text such as work/life is not a project path
@@ -346,10 +346,10 @@ def _normalise_architecture(file: str, stem: str, data: dict) -> dict:
         req = ch.get("required")
         if req not in _REQUIRED:
             _arch_fail(file, f"{p}.required", "expected one of " + ", ".join(_REQUIRED))
-        if req == "if-clause-kind":
+        if req == "if-kind":
             _arch_str_list(file, f"{p}.kinds", ch.get("kinds"), CLAUSE_KINDS, non_empty=True)
         elif ch.get("kinds"):
-            _arch_fail(file, f"{p}.kinds", 'only a chapter with required "if-clause-kind" has kinds')
+            _arch_fail(file, f"{p}.kinds", 'only a chapter with required "if-kind" has kinds')
         skeleton = ch.get("skeleton")
         if skeleton is not None and (not isinstance(skeleton, str) or not skeleton.strip()):
             _arch_fail(file, f"{p}.skeleton", "expected LAYOUT[:VARIANT] or null")
@@ -361,7 +361,7 @@ def _normalise_architecture(file: str, stem: str, data: dict) -> dict:
             _arch_fail(file, f"{p}.separate", "expected true or false")
         separates += 1 if sep else 0
         out_ch.append({"id": cid, "title": ch["title"], "purpose": ch["purpose"], "roles": list(ch["roles"]),
-                       "required": req, "kinds": list(ch["kinds"]) if req == "if-clause-kind" else [],
+                       "required": req, "kinds": list(ch["kinds"]) if req == "if-kind" else [],
                        "skeleton": skeleton, "part": part, "separate": sep})
     if "cover" not in out_ch[0]["roles"]:
         _arch_fail(file, "chapters[0].roles", 'the first chapter must have the role "cover"')
@@ -431,23 +431,60 @@ def clauses_of(brief: dict) -> list[dict]:
     return [c for c in v if isinstance(c, dict) and isinstance(c.get("n"), str)] if isinstance(v, list) else []
 
 
+def deliverables_of(brief: dict) -> list[dict]:
+    """The deliverable dicts of brief.json whose id is a string (others are left to gates.py brief)."""
+    v = brief.get("deliverables")
+    return [d for d in v if isinstance(d, dict) and isinstance(d.get("id"), str)] if isinstance(v, list) else []
+
+
 def graphics_of(brief: dict) -> list[dict]:
     """The dict entries of brief.json graphics (empty when missing or not a list)."""
     v = brief.get("graphics")
     return [g for g in v if isinstance(g, dict)] if isinstance(v, list) else []
 
 
+def kinds_of(item: dict) -> list[str]:
+    """The kinds of a clause or deliverable: kind is one kind or a list of kinds; unknown values are dropped."""
+    k = item.get("kind")
+    ks = k if isinstance(k, list) else [k]
+    return [x for x in ks if isinstance(x, str) and x in CLAUSE_KINDS]
+
+
+def brief_kinds(brief: dict) -> set:
+    """Every kind the brief asks for: the kinds of its clauses and deliverables, plus "graphics" when it lists
+    graphics (a graphic is a deliverable of that kind)."""
+    out = set()
+    for it in clauses_of(brief) + deliverables_of(brief):
+        out.update(kinds_of(it))
+    if graphics_of(brief):
+        out.add("graphics")
+    return out
+
+
 def required_chapters(arch: dict, brief: dict) -> list[str]:
-    """Chapter ids required for this brief, in order: always; if-clause-kind when a clause kind is in the
-    chapter kinds; if-graphics when brief.json lists graphics."""
-    kinds = {c.get("kind") for c in clauses_of(brief)}
-    has_graphics = bool(graphics_of(brief))
+    """Chapter ids required for this brief, in order: always; if-kind when a kind of brief_kinds is in the
+    chapter kinds."""
+    kinds = brief_kinds(brief)
+    return [ch["id"] for ch in arch["chapters"]
+            if ch["required"] == "always" or (ch["required"] == "if-kind" and kinds & set(ch["kinds"]))]
+
+
+def separate_items(arch: dict | None, brief: dict) -> list[str]:
+    """The items submitted separately, in the words of the page: "<n> <title>" for each clause and "<title>" for
+    each deliverable whose kinds include a separate-submission kind (clauses first, brief order). The title of a
+    clause is its title, else its text. Empty without an architecture or without such items."""
+    if arch is None:
+        return []
+    sep = set(arch["separate_submission"])
     out = []
-    for ch in arch["chapters"]:
-        req = ch["required"]
-        if req == "always" or (req == "if-clause-kind" and kinds & set(ch["kinds"])) \
-                or (req == "if-graphics" and has_graphics):
-            out.append(ch["id"])
+    for c in clauses_of(brief):
+        t = c.get("title") if isinstance(c.get("title"), str) and c["title"].strip() else c.get("text")
+        if sep & set(kinds_of(c)) and isinstance(t, str) and t.strip():
+            out.append(f"{c['n']} {' '.join(t.split())}")
+    for d in deliverables_of(brief):
+        t = d.get("title")
+        if sep & set(kinds_of(d)) and isinstance(t, str) and t.strip():
+            out.append(" ".join(t.split()))
     return out
 
 

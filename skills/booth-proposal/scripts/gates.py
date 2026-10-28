@@ -20,9 +20,9 @@ import re
 import sys
 
 from common import (CLAUSE_KINDS, CLAUSE_N_RE, DEFAULTS, Finding, InputError, _CONCEPT_ID_RE, _LEGACY_SET,
-                    _SET_ID_RE, _images_in, architecture_choice, concept_ref, find_project, inside, list_concepts,
-                    load_architectures, load_labels, now_iso, print_findings, read_front_matter, read_json,
-                    read_review, read_sidecar, real, required_chapters, review_is_current_pass, scan_reference_sets,
+                    _SET_ID_RE, _images_in, architecture_choice, clauses_of, concept_ref, deliverables_of,
+                    find_project, inside, kinds_of, list_concepts, load_architectures, load_labels, now_iso,
+                    print_findings, read_front_matter, read_json, read_review, read_sidecar, real, required_chapters, review_is_current_pass, scan_reference_sets,
                     sha256_file, sidecar_version, to_m, trace_base_chain, write_json)
 
 _BRIEF = "brief/brief.json"
@@ -35,6 +35,10 @@ _REPORT_KEYS = ("brief", "ideas", "renders", "concepts", "pass", "fail", "none",
 
 def _nonempty_str(v) -> bool:
     return isinstance(v, str) and bool(v.strip())
+
+
+def _has_digit(t: str) -> bool:
+    return any(c.isdigit() for c in t)
 
 
 def _is_number(v) -> bool:
@@ -122,8 +126,29 @@ def _proposal_problems(project, add, out) -> None:
                            "architecture: " + unknown(th["architecture"])))
 
 
+_KIND_MSG = "kind must be one of " + ", ".join(CLAUSE_KINDS) + ", or a list of them"
+
+
+def _kind_ok(kind) -> bool:
+    """One of CLAUSE_KINDS, or a non-empty list of distinct ones."""
+    if isinstance(kind, list):
+        return bool(kind) and len(set(map(str, kind))) == len(kind) and all(isinstance(k, str) and k in CLAUSE_KINDS
+                                                                           for k in kind)
+    return isinstance(kind, str) and kind in CLAUSE_KINDS
+
+
+def _points_problems(item, p, points, add) -> None:
+    pts = item.get("points", [])
+    if not (isinstance(pts, list) and all(isinstance(x, str) for x in pts)):
+        add(f"{p}.points", "field", "points must be a list of design point ids")
+    else:
+        for j, x in enumerate(pts):
+            if x not in points:
+                add(f"{p}.points[{j}]", "points", f"'{x}' is not a design point id")
+
+
 def _clause_problems(project, add) -> None:
-    """clauses[] of brief.json (rule: field, clause-n, clause-kind, points, source)."""
+    """clauses[] of brief.json (rule: field, clause-n, clause-kind, points, source, title)."""
     b = project.brief
     value = b.get("clauses")
     if value is None:
@@ -132,6 +157,7 @@ def _clause_problems(project, add) -> None:
         add("clauses", "field", "clauses must be a list")
         return
     points = _ids_of(b, "design_points")
+    arch = project.architecture
     seen: set = set()
     for i, item in enumerate(value):
         p = f"clauses[{i}]"
@@ -149,19 +175,60 @@ def _clause_problems(project, add) -> None:
             seen.add(n)
         if not _nonempty_str(item.get("text")):
             add(f"{p}.text", "field", "text must be a non-empty string")
+        if "title" in item:
+            if not _nonempty_str(item["title"]):
+                add(f"{p}.title", "field", "title must be a non-empty string")
+            elif _has_digit(item["title"]):
+                add(f"{p}.title", "title", "title must not contain digits (it may be shown on the separate page)")
+        if "title" not in item and _nonempty_str(item.get("text")) and _has_digit(item["text"])                 and _kind_ok(item.get("kind")) and arch is not None                 and set(arch["separate_submission"]) & set(kinds_of(item)):
+            add(f"{p}.title", "title", "add a short title without digits (the text has digits and the clause is "
+                                       "submitted separately; its text would be shown on the separate page)")
         if "source" in item and not isinstance(item["source"], str):
             add(f"{p}.source", "field", "source must be a string")
         elif not _nonempty_str(item.get("source")):
             add(f"{p}.source", "source", "source is missing or blank")
-        if item.get("kind") not in CLAUSE_KINDS:
-            add(f"{p}.kind", "clause-kind", "kind must be one of " + ", ".join(CLAUSE_KINDS))
-        pts = item.get("points", [])
-        if not (isinstance(pts, list) and all(isinstance(x, str) for x in pts)):
-            add(f"{p}.points", "field", "points must be a list of design point ids")
-        else:
-            for j, x in enumerate(pts):
-                if x not in points:
-                    add(f"{p}.points[{j}]", "points", f"'{x}' is not a design point id")
+        if not _kind_ok(item.get("kind")):
+            add(f"{p}.kind", "clause-kind", _KIND_MSG)
+        _points_problems(item, p, points, add)
+
+
+def _deliverable_problems(project, add) -> None:
+    """deliverables[] of brief.json (rule: field, id, source, title, clause-kind, points)."""
+    b = project.brief
+    value = b.get("deliverables")
+    if not isinstance(value, list):
+        return
+    points = _ids_of(b, "design_points")
+    for i, item in enumerate(value):
+        p = f"deliverables[{i}]"
+        if not isinstance(item, dict):
+            continue
+        t = item.get("title")
+        if _nonempty_str(t) and _has_digit(t):
+            add(f"{p}.title", "title", "title must not contain digits (it may be shown on the separate page)")
+        if not _kind_ok(item.get("kind")):
+            add(f"{p}.kind", "clause-kind", _KIND_MSG)
+        _points_problems(item, p, points, add)
+
+
+def _coverage_problems(project, out) -> None:
+    """Warn for a design point that no clause or deliverable lists, when the architecture answers by clauses."""
+    arch = project.architecture
+    b = project.brief
+    if arch is None or arch["response"] != "clauses":
+        return
+    if not (clauses_of(b) or deliverables_of(b)):
+        return
+    covered: set = set()
+    for it in clauses_of(b) + deliverables_of(b):
+        pts = it.get("points")
+        if isinstance(pts, list):
+            covered.update(x for x in pts if isinstance(x, str))
+    dp = b.get("design_points")
+    for i, item in enumerate(dp if isinstance(dp, list) else []):
+        if isinstance(item, dict) and _nonempty_str(item.get("id")) and item["id"] not in covered:
+            out.append(Finding("G-BRIEF", "warn", f"{_BRIEF} design_points[{i}]",
+                               f"coverage: design point {item['id']} is in the points of no clause or deliverable"))
 
 
 def _graphic_ref_ok(project, ref: str) -> bool:
@@ -275,13 +342,16 @@ def _brief_problems(project) -> list[Finding]:
     items("claims", r"C\d+", ("id", "text"), True)
     items("assumptions", r"A\d+", ("id", "text"), False, optional=True)
     items("graphics", r"GR\d+", ("id", "title", "purpose", "ratio"), False, optional=True)
+    items("deliverables", r"DL\d+", ("id", "title"), True, optional=True)
     _proposal_problems(project, add, out)
     _clause_problems(project, add)
+    _deliverable_problems(project, add)
     _graphic_problems(project, add)
 
     if _nonempty_str(lang) and not project.labels:
         out.append(Finding("G-BRIEF", "error", f"assets/labels/{lang}.json",
                            "labels: no label file for the lang named in brief.json"))
+    _coverage_problems(project, out)
     return out
 
 
@@ -840,10 +910,8 @@ def cmd_report(project, args) -> int:
 def _chapter_note(ch: dict) -> str:
     if ch["required"] == "never":
         return f"{ch['id']} (optional)"
-    if ch["required"] == "if-clause-kind":
-        return f"{ch['id']} (if clause kind {'/'.join(ch['kinds'])})"
-    if ch["required"] == "if-graphics":
-        return f"{ch['id']} (if graphics)"
+    if ch["required"] == "if-kind":
+        return f"{ch['id']} (if kind {'/'.join(ch['kinds'])})"
     return ch["id"]
 
 
