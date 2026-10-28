@@ -22,7 +22,7 @@ Make the tiles first: `python scripts/render.py tiles concepts/set-1/A/renders/h
 
 ### Reviewer brief
 
-Fill the brackets from brief.json, and pass the brief to the reviewer as it stands:
+Fill the brackets from brief.json and pass the brief as it stands (its premium questions are for review only, never for prompts):
 
 ```
 You are reviewing one concept render of an exhibition stand for a design proposal. You see only the image and its tiles. You do not know the brief, the prompt or the idea; do not guess them.
@@ -71,9 +71,17 @@ The output of `render.py logo` inherits the base's review plus a `composited_log
 
 **If none of the candidates passes:** tell the user what one more round costs, then make one new round. If that fails too, offer the closest candidate and say what is off. A render that has not passed cannot be chosen.
 
-## Premium questions
+### Graphics
 
-Item 3 of the reviewer brief. They are for review only, never for prompts.
+A graphic is read up close and carries words, so its review differs:
+
+- **The reviewer gets** the image and its tiles (`work/tiles/graphics/GR1/<stem>/`), never the prompt, the title or the product photos. The brief opens "You are reviewing one flat graphic for a design proposal, ratio [r]", drops the Booth line, and item 2 becomes "Text area. Is the [side] area calm and plain enough to set a headline over it? yes or no".
+- **Marks:** `pseudo_text` fails too, as does `pasted_photo`: a product pasted or traced from a photo rather than redrawn.
+- **Gates:** the text-area gate (`--text-area yes|no`) replaces the size gate.
+
+```
+python scripts/render.py review graphics/GR1/renders/graphic-v2.png --reviewer subagent --verdict pass --premium yes --scope full --text-area yes --marks-json '[]' --notes "Calm navy field above the ferry."
+```
 
 ## Side by side
 
@@ -83,20 +91,14 @@ After choosing, run `python scripts/render.py sheet --set <set> --chosen`: the s
 
 ### When
 
-Once every page is filled:
-
-1. `python scripts/deck.py check`, then `python scripts/deck.py render`. Fix until render reports zero overflow.
-2. Pass 1, then Pass 2 (below), then `python scripts/deck.py review --record work/deck-review.input.json`.
-3. `python scripts/deck.py export`. When check now reports D-REF `stale`, run `deck.py render` first: coverage quotes decide which pages a design-point reference names.
-
-Export refuses while check has errors, the render is missing, stale or shows overflow, or the record is missing, stale, holds an unresolved pass-2 finding or a pending word without `keep`.
+Once every page is filled and `deck.py render` reports no error and zero overflow: Pass 1, then Pass 2, then `python scripts/deck.py review --record work/deck-review.input.json`, then `deck.py export` (6-proposal.md, `## The loop`). Coverage quotes decide which pages a design-point reference names, so a D-REF `stale` after recording needs `deck.py render` first.
 
 The record holds a hash of each page's `deck.py text` block and of its images. Layout-only edits, such as a class or a style, keep the record. After a text or image change, run `python scripts/deck.py text --diff`: it lists the pages `ADDED`, `REMOVED` and `CHANGED` since the record and prints only those. Review them again in both passes; a changed page loses its recorded items, coverage quotes and pending decisions included.
 
 ### Pass 1
 
 Cold read, text only. The reviewer reads the deck as the client will. They get only:
-- the output of `python scripts/deck.py text`;
+- the output of `python scripts/deck.py text` (filled-in text such as the separate page shows as `[auto]` lines);
 - the design points as `id: text` lines, without sources;
 - the pending findings of `deck.py check` as code, page and word, for example `D-TXT-PENDING b-board "builds on"`.
 
@@ -110,9 +112,9 @@ Their answer fills four lists in `pass1`:
 
 ### Pass 2
 
-Images against words. The reviewer gets `work/contact.png`, each placed render's `.review.json`, the output of `deck.py text`, and `python scripts/booth_geometry.py facts concepts/<set>/<concept>/geometry.json` for each selected concept.
+Images against words. The reviewer gets `work/contact.png`, each placed image's `.review.json`, the output of `deck.py text`, and `python scripts/booth_geometry.py facts concepts/<set>/<concept>/geometry.json` for each selected concept.
 
-They check that the words describe what is visible (what the image does not show is worded as design intent); counts, names and positions match the image and the facts; titles are claims, not labels; the cover uses the strongest image; adjacent pages differ in layout; each page has one hero.
+They check that the words describe what is visible (what the image does not show is worded as design intent); counts, names and positions match the image and the facts; titles are claims, not labels; the cover uses the strongest image; adjacent pages differ in layout; each page has one hero. On a graphic page the words over the artwork read easily; settle any D-LAYOUT `legibility` warning here.
 
 Their answer fills `pass2.findings`, each `{page_id, kind, note, resolved}`. `kind` is one of `mismatch`, `design_intent`, `title_is_label`, `cover`, `adjacent_layout`, `other`. Fix what you can and set `resolved` to `true`; an item left `false` blocks export.
 
@@ -124,7 +126,7 @@ Write both answers to `work/deck-review.input.json`:
 {
   "pass1": {
     "reviewer": "subagent",
-    "unexplained": [{"page_id": "b-board", "quote": "As before, the lounge faces the aisle.", "action": "rewritten"}],
+    "unexplained": [],
     "internal_notes": [],
     "coverage": [
       {"point": "D1", "page_id": "a-board", "quote": "A deck you walk onto from two sides."},

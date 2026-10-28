@@ -1,0 +1,38 @@
+{
+  "schema": "ideas/1",
+  "insights": [
+    {
+      "id": "I1",
+      "text": "Crossings are remembered as thresholds that visitors pass",
+      "source": "D1"
+    }
+  ],
+  "sets": [
+    {
+      "set": "set-1",
+      "ideas": [
+        {
+          "id": "A",
+          "name": "Tidal Gate",
+          "idea": "A deep gate of layered blue ribs that visitors walk through into a calm lounge",
+          "booth_type": "a gate you walk through",
+          "chosen": true
+        },
+        {
+          "id": "B",
+          "name": "Hull",
+          "idea": "A curved timber hull with a lounge inside its ribs",
+          "booth_type": "an object you walk around",
+          "chosen": true
+        },
+        {
+          "id": "C",
+          "name": "Pier",
+          "idea": "A long jetty of pale boards leading to a counter",
+          "booth_type": "a facade you face",
+          "chosen": false
+        }
+      ]
+    }
+  ]
+}

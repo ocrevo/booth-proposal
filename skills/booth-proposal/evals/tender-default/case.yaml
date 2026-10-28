@@ -1,0 +1,22 @@
+schema_version: "1.1"
+name: tender-default
+expected_outcome: |
+  A numbered Nordvik tender (input/rfp.md) and a project finished up to step 3: brief.json holds the clauses 2, 3, 5,
+  7.1 and 8 (8 is mixed, kind design and execution), four deliverables from the unnumbered "must contain" list (one of
+  kind graphics) and one requested graphic GR1; it names no architecture. set-1/A and set-1/B have prompts; GR1 has
+  graphics/GR1/prompts/graphic.txt. The user made the images elsewhere (incoming/) and asks for the proposal as a PDF
+  without image API calls. The skill uses the default architecture (tender) without asking: it imports the renders with
+  `render.py import --concept` and the graphic with `render.py import --graphic GR1 --area top`, reviews every
+  imported image (the graphic with `--text-area yes`), chooses reviewed passing ones, runs `gates.py select set-1/A
+  set-1/B --lead set-1/A`, develops both concepts, and builds the deck with `deck.py new`, which writes the tender
+  chapters cover, understanding, design, interaction, graphics, separate and appendix. The design chapter answers
+  clauses 2, 3 and 8 (design part); interaction answers clause 5. The graphics chapter has one graphic page from
+  `deck.py layouts --emit graphic --graphic GR1` showing the imported graphic with the kicker, headline and line set
+  over it in HTML (nothing painted in the artwork). The separate page carries the fixed sentence and the items 7.1,
+  8, the schedule and headcount deliverable and the itemised price deliverable, with no figure on it or anywhere else
+  in the proposal. The appendix response table has a row for every clause and every deliverable, each with page
+  references (price and execution rows point to the separate page; clause 8 to its design page and the separate
+  page). The deck passes `deck.py check`, is rendered and reviewed in two passes, and pack/proposal.pdf is exported.
+  No reference photo and no sentence about a reference appears in the proposal. The user is told to send only the PDF.
+context:
+  scaffold_script: place-files.sh

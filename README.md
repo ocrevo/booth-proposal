@@ -4,7 +4,7 @@
 
 ## 简介
 
-给它一份展台招标书和一套或几套参考照片，它为每套参考做出几个不同的展台方案，每个方案都有一个想法和一张经过审核的主视图；你从所有方案里自由挑选，选中的方案再做尺寸核算和平面图，最后生成一份只展示我们自己设计的提案 PDF，可以直接发给客户。
+给它一份展台招标书和一套或几套参考照片，它为每套参考做出几个不同的展台方案，每个方案都有一个想法和一张经过审核的主视图；你从所有方案里自由挑选，选中的方案再做尺寸核算和平面图，最后生成一份提案 PDF，可以直接发给客户。提案默认按招标文件逐条回应（招标回应型），也可以指定为设计展示型；两种都只展示我们自己的设计，从不展示参考图。
 
 它是一个 [Agent Skill](https://agentskills.io)，同一个文件夹可在 Claude Code、Codex、ChatGPT 和 Claude.ai 中使用。
 
@@ -14,12 +14,12 @@
 
 | 步骤 | 模型写什么 | 由谁把关 | 给你看什么 |
 | --- | --- | --- | --- |
-| 1 简报 | `brief/brief.json`（设计要点、需签认的说法、假设，均带出处）和阅读笔记 | `gates.py brief --stamp` | 简报报告，加上最可能改变设计的那条假设 |
+| 1 简报 | `brief/brief.json`（设计要点、招标条款与交付物、要求的平面稿、需签认的说法、假设，均带出处；可选的提案架构）和阅读笔记 | `gates.py brief --stamp` | 简报报告，加上最可能改变设计的那条假设 |
 | 2 框架 | brief.json 里的展位（尺寸、限高、开口、吊挂、功能项）和框架笔记 | `gates.py frame` | 三行说清展位：尺寸与限高、开口、能否吊挂 |
-| 3 想法 | 每套参考的想法写进 `brief/ideas.json`，以及展台要说的话 | `gates.py ideas --scaffold` | 每套参考一张想法表，以及出图的张数和时间 |
-| 4 出图 | 每个入选想法一段短提示词；在 concept.md 里写 `chosen:` 和 `blocked:` | 每次出图前 `render.py lint`；`gates.py renders` | 每套参考的候选图板和总览，然后等你选方案 |
+| 3 想法 | 每套参考的想法写进 `brief/ideas.json`，以及展台要说的话 | `gates.py ideas --scaffold` | 每套参考一张想法表，以及出图的张数和时间（含平面稿） |
+| 4 出图 | 每个入选想法一段短提示词，brief 要求的每张平面稿一段提示词；在 concept.md、graphic.md 里写 `chosen:` 和 `blocked:` | 每次出图前 `render.py lint`；`gates.py renders` | 每套参考的候选图板、总览和平面稿图板，然后等你选方案 |
 | 5 深化 | 选中方案的 `geometry.json` 和内容布置 | `booth_geometry.py check`；`gates.py concepts` | 每个方案的平面图和白模（白模只给你核对尺寸） |
-| 6 提案 | `deck/storyboard.md` 和 `pack/proposal.html` | `deck.py check`；`deck.py export` | 缩略总览图、第二轮审阅的结论、`pack/proposal.pdf` |
+| 6 提案 | 按所选架构写 `deck/storyboard.md` 和 `pack/proposal.html` | `deck.py check`；`deck.py export` | 缩略总览图、第二轮审阅的结论、`pack/proposal.pdf` |
 
 `start` 会把每一步的结果都给你看，然后接着做；整个流程只在一处停下：每套参考的候选图板和总览出来之后，等你选方案。选定后第 5、6 步只针对选中的方案。`step mode` 则每一步都停，等你说继续。
 
@@ -60,29 +60,67 @@ python $S/gates.py select --show                            # 查看当前选择
 - **每张图都要审。** 审图的是一个全新的子代理：只给图、切片和展位尺寸，不给提示词、方案名和参考图。代码记录答案并算出结论，三道硬门槛：画面干净（没有文字、数字、名字、类 logo 图形）、尺寸对（宽深在 `size_tolerance` 约 20% 以内，高度不超限）、够高级。只有当前图像的完整审核通过，才能被选中。
 - **logo 由代码贴上。** `render.py logo` 把客户的正式 logo 文件贴到留好的素面板上，新图继承原图的审核结果。
 - **在别处出的图也能用。** 用 ChatGPT 或 Claude.ai 接入的图像工具出图后，用 `render.py import` 导入，记录来源，审核要求完全一样。
+- **平面稿也由图像模型画。** 招标要求设计的平面稿（如展板）写在 brief.json 的 `graphics` 里，每张一个文件夹 `graphics/<GR>/`，用 `render.py graphic` 出图。图像模型只画插画，不画任何文字、数字和 logo，并在提示词指定的一侧（`--area`：上、下、左、右）留出干净的空白；标题和正文在提案里用 HTML 叠在空白处，logo 由 `render.py logo` 合成。产品图只作造型参考，必须重新绘制，原图永远不进提案。审图规则与效果图相同，只是尺寸关卡换成「留白能否放字」（`--text-area`）。平面稿只在招标回应型里使用，设计展示型里 `render.py graphic` 会拒绝。
 
 ```bash
 python $S/render.py lint --mode hero --prompt concepts/set-1/A/prompts/hero.txt --concept set-1/A --ref input/refs/set-1/r01.jpg
 python $S/render.py hero --concept set-1/A --prompt concepts/set-1/A/prompts/hero.txt --ref input/refs/set-1/r01.jpg --dry-run
 python $S/render.py import 下载的图.png --concept set-1/A --ref input/refs/set-1/r01.jpg --prompt concepts/set-1/A/prompts/hero.txt
+python $S/render.py graphic --graphic GR1 --prompt graphics/GR1/prompts/graphic.txt --area top --ref input/product.png --dry-run
+python $S/gates.py renders --graphic GR1                    # 检查平面稿的选定图和审核
 ```
 
-默认模型 `gpt-image-2`、1536×1024、高质量。key 读环境变量 `OPENAI_API_KEY`，或项目文件夹及上级文件夹里 `.env` 的 `OPENAI_API_KEY=` 一行。每张图都是付费的：第一次出图前先用 `--dry-run` 看一遍，并先告诉你张数和大致时间（`gates.py report ideas`）。
+默认模型 `gpt-image-2`、1536×1024、高质量。key 读环境变量 `OPENAI_API_KEY`，或项目文件夹及上级文件夹里 `.env` 的 `OPENAI_API_KEY=` 一行。平面稿的尺寸按 brief 里的比例取最接近的一种（竖版 1024×1536、方形 1024×1024、横版 1536×1024）。每张图都是付费的：第一次出图前先用 `--dry-run` 看一遍，并先告诉你张数和大致时间（`gates.py report ideas`，平面稿按张数 × 每张候选数计入）。
 
 ## 提案
 
-提案只有一个来源：`pack/proposal.html`，16:9 页面，由模板的版式拼成，每一个字都由模型写在 HTML 里，再导出成 `pack/proposal.pdf`。它是设计展示：不含工程、工期、人员、报价和场馆技术事项，也不含任何内部内容（编号、出处、文件名、套名、待办、检查结果）。页面顺序只是建议，不是规定。
+提案只有一个来源：`pack/proposal.html`，16:9 页面，由模板的版式拼成，每一个字都由模型写在 HTML 里，再导出成 `pack/proposal.pdf`。不论哪种架构，提案都不含工程与结构、场馆技术事项，不写任何工期、人数、价格数字，也不含任何内部内容（brief 的内部编号、出处、文件名、套名、待办、检查结果）；招标自己的条款编号可以写在页上。
 
 ### 两种提案架构
 
-- **架构 A：设计展示型**，即下面的提案提纲，是 skill 现在的默认做法。
-- **架构 B：招标回应型**，章节顺序跟随招标文件，逐条回应其要求。
+架构就是提案的章节方案，每种登记为 skill 里的一份定义（`assets/architectures/<id>.json`）。现在有两种：
 
-两种架构的对比，以及与国际常见做法的三方对照，见 [docs/proposal-architectures.md](docs/proposal-architectures.md)。
+| | 招标回应型 `tender`（默认） | 设计展示型 `showcase` |
+|---|---|---|
+| 何时使用 | 不指定时一律用它；brief 没有编号条款时也用它，按设计要点的顺序排 | 只在明确指定时 |
+| 排序依据 | 跟随招标：复述需求，逐条回应条款 | 设计叙事：需求、洞察、方案、比选、主推方案深化 |
+| 章节 | 封面、项目理解、设计方案、附录总是必需；互动方案、平面设计、另行提交由 brief 触发（见下表）；缺必需章节报错，顺序不对给警告 | 全部可选，顺序只是建议；`deck.py new` 只写封面 |
+| 回应表 | 每条条款、每项交付物一行，指向回应它的页 | 每个设计要点一行 |
+| 工期、人员、报价 | 招标要求时只放一页「另行提交」，不写任何内容和数字 | 不出现 |
+| 平面稿 | brief 要求时每张一页 | 不放（`D-IMG-FORBIDDEN` `kind`），也不出图 |
 
-### 提案提纲（架构 A）
+怎样选：
 
-建议顺序，正文约 12–16 页（细节见 [6-proposal.md](skills/booth-proposal/references/6-proposal.md)）：
+- 聊天里说 `start`，用默认的招标回应型；说 `start showcase`（或「用设计展示型」），先写入架构再开始；中途换用 `architecture <id>`。
+- 选择写在 brief.json 的 `proposal.architecture`（项目也可以在 `brief/deck-style.json` 的 `thresholds.architecture` 里覆盖默认值）。名字不存在时 `gates.py brief` 报 `G-BRIEF`（`architecture`），并列出已有的架构。
+- 已经有提案时换架构，用 `deck.py new --force` 按新架构重建骨架，旧的提案移到 `work/backup/`。
+
+```bash
+python $S/gates.py architectures            # 列出已有架构：简介、回应表排法、可用图片类型、章节及必需条件
+python $S/gates.py architectures --json     # 同上，机器可读
+```
+
+两种架构的来历、与国际常见做法的三方对照，见 [docs/proposal-architectures.md](docs/proposal-architectures.md)。
+
+### 招标回应型提纲（架构 B，默认）
+
+章节是通用的：可选章节只由 brief 自己的条款（`clauses`，带招标编号）、交付物（`deliverables`，没有编号的「提案须包含」）和平面稿清单（`graphics`）触发，不带任何具体招标的定制内容。细节见 [arch-tender.md](skills/booth-proposal/references/arch-tender.md)。
+
+| # | 章 | 何时必需 | 内容 |
+|---|---|---|---|
+| 1 | 封面 `cover` | 总是 | 提案标题、主效果图、客户与展会 |
+| 2 | 项目理解 `understanding` | 总是 | 项目与展会复述、展位规格（可选自绘 `site.svg`）、用平实的话说清招标要什么 |
+| 3 | 设计方案 `design` | 总是 | 方案板、平面图、标注图，几个方案时加比选；然后按条款顺序，每条设计条款一页或一组，页上可以写招标的条款编号 |
+| 4 | 互动方案 `interaction` | 有互动类条款或交付物 | 观众做什么、内容、动线 |
+| 5 | 平面设计 `graphics` | brief 列了平面稿，或有平面类条款 | 每张平面稿一页（`graphic` 或 `graphic:wide` 版式）：选定的插画，标题和正文用 HTML 叠在留白处，旁边写挂在哪里、说什么；缺页报错 |
+| 6 | 另行提交 `separate` | 有工期类（execution）或报价类（price）条款或交付物 | 只有一页，由 `deck.py new` 生成：标题、固定句「执行工期、现场人员与报价另行提交。」，以及这些条款和交付物的清单；不能加别的文字，任何工期、人数、价格数字都报错（`D-NUMBER` `separate`） |
+| 7 | 附录 `appendix` | 总是 | 回应表：每条条款、每项交付物一行（条款编号、我们的回应、页码）；工期和报价类指向另行提交页，混合条款同时指向设计页和另行提交页；然后是待客户确认的表述 |
+
+每条设计要点都应落在某条条款或交付物的 `points` 里，否则 `gates.py brief` 和 `deck.py check` 给出 `coverage` / `points` 警告。
+
+### 设计展示型提纲（架构 A，需指定）
+
+内容与以前相同。建议顺序，正文约 12–16 页（细节见 [arch-showcase.md](skills/booth-proposal/references/arch-showcase.md)）：
 
 | # | 部分 | 内容 |
 |---|---|---|
@@ -108,17 +146,19 @@ python $S/render.py import 下载的图.png --concept set-1/A --ref input/refs/s
 | 文字、材料、互动 | `statement`、`cards:n2/n3/n4/n6`、`detail`、`facts`、`flow`、`gallery:g1–g4`、`free` |
 | 比选 | `compare` |
 | 回应表、确认清单 | `table`（回应表也可用 `cards`） |
+| 平面稿（招标回应型） | `graphic`、`graphic:wide`（`--emit graphic --graphic GR1` 直接填好图和留白位置） |
+| 另行提交（招标回应型） | `statement:separate`（由 `deck.py new` 生成，brief 改了以后重新 `--emit statement:separate --chapter separate` 替换） |
 
-提案里永远不放：参考图、白模、工程与结构、工期、人员、报价，以及任何内部编号和文件名。
+两种架构的提案里都永远不放：参考图、白模、工程与结构，工期、人员、报价的任何内容或数字（招标回应型只说明另行提交），以及任何内部编号和文件名。
 
 国际展览与品牌体验公司的提案通常包含哪些部分，以及与本提纲的对照，见 [docs/proposal-strategies.md](docs/proposal-strategies.md)。
 
 ### 制作流程
 
-1. 先写 `deck/storyboard.md`，每页一行：作用、要回应哪些设计要点、用哪张图。
-2. `deck.py new` 生成外壳，`deck.py layouts --emit` 给出每种版式的片段，粘进去填字。
+1. 先写 `deck/storyboard.md`，每页一行：所属章节、作用、要回应哪些条款或设计要点、用哪张图。
+2. `deck.py new` 按当前架构生成外壳和章节骨架（每章第一页带 `data-chapter`），`deck.py layouts --emit` 给出每种版式的片段（`--chapter` 设定所属章节），粘进去填字。
 3. `deck.py check`（只读）找错，`deck.py render` 生成预览、缩略总览图并测量溢出，循环到零错误、零溢出。
-4. 两轮审阅：第一轮只读文字的冷读（有没有讲参考、有没有内部笔记、每个设计要点在哪页有原句回应）；第二轮图文对照（文字说的和图上看到的、和几何数据是否一致）。结果用 `deck.py review --record` 记录。
+4. 两轮审阅：第一轮只读文字的冷读（有没有讲参考、有没有内部笔记、每个设计要点在哪页有原句回应）；第二轮图文对照（文字说的和图上看到的、和几何数据是否一致；平面稿上叠的字是否易读，`D-LAYOUT` `legibility` 警告在这里处理）。结果用 `deck.py review --record` 记录。
 5. `deck.py export`：检查有错、渲染过期或有溢出、审阅缺失或过期、第二轮还有没解决的问题，都会拒绝导出。
 
 `pack/` 只允许放 `proposal.html`、`proposal.pdf`、`site.svg`，其他生成的文件都在 `work/`。**发给客户的只有 `pack/proposal.pdf`**，不要发文件夹、压缩包或 HTML。
@@ -144,15 +184,16 @@ pip install -r requirements.txt
 
 | 命令 | 作用 |
 | --- | --- |
-| `start` | 跑完整个流程，只在选方案前停一次 |
+| `start [架构]` | 跑完整个流程，只在选方案前停一次；不写架构就用招标回应型，写了（如 `start showcase`）先记进 brief.json 再开始 |
 | `step mode` | 每一步都停，等你说继续 |
+| `architecture <id>` | 换提案架构：写入 brief.json，跑 `gates.py brief`；已有提案时用 `deck.py new --force` 重建（`gates.py architectures` 列出可选的） |
 | `change <内容>` | 修改假设、尺寸、参考或文字，只重做受影响的部分 |
 | `add set <名字>` | 新增一套参考：照片放进 `input/refs/<名字>/`，只为这一套做想法和出图，再给你看它的图板和总览 |
 | `select <套>/<方案> … [lead <套>/<方案>]` | 选定要深化的方案和主推方案（`gates.py select`），然后做第 5、6 步 |
 | `show <项目>` | 完整查看某份报告、笔记、图板或图片，如 `show brief`、`show selection` |
-| `render <套>/<方案>` | 重新给这个方案出图 |
+| `render <套>/<方案>` | 重新给这个方案出图；`render GR1` 重出一张平面稿 |
 | `pack` | 第 6 步：生成或更新提案、检查、渲染、审阅、导出 |
-| `status` | 每步进度、未确认的假设、当前选择和提案状态 |
+| `status` | 每步进度、提案架构、未确认的假设、当前选择和提案状态 |
 
 ## 项目文件夹
 
@@ -165,6 +206,7 @@ pip install -r requirements.txt
                               selection.json（只由代码写）、brand/（正式 logo）、media/（从文件里取出的图，不展示）
   concepts/<套名>/<方案>/     concept.md、prompts/hero.txt、renders/（每张图连同提示词、记录和审核）
                               选中方案另有 geometry.json、平面图；白模只供内部核对
+  graphics/<GR>/              brief 要求的每张平面稿：graphic.md、prompts/graphic.txt、renders/
   deck/storyboard.md          提案分镜
   pack/                       只放 proposal.html、proposal.pdf、site.svg
   work/                       其他所有生成文件：检查、预览、切片、图板、备份
@@ -201,7 +243,8 @@ python tools/scan_client_terms.py                          # 扫描仓库里不�
 
 - 只到概念阶段，不是施工图，不替代结构设计和工程确认；功能项尺寸、通道和净空都是经验值，以场馆规定和设计师为准。
 - 效果图的尺寸和品质由模型审图判断，不是测量；真正的尺寸以几何数据和平面图为准。
-- v2 的测试和评测没有用真实的图像 API key 跑过，出图部分只验证到 lint 和 `--dry-run`。
+- v2 的测试和评测没有用真实的图像 API key 跑过，效果图和平面稿都只验证到 lint 和 `--dry-run`。
+- 招标回应型只按 brief 里记下的条款、交付物和平面稿搭章节；条款归类（设计、互动、工期、报价等）由模型读标书时判断，脚本不读原始标书。
 - HTML 导出 PDF 需要本机有 Chrome 或 Edge；没有时只能交出 HTML，由你自己打印。
 - 不编造事实：墙上的每一句话都能追溯到客户原文；夸大、受监管或可能过时的说法在提案里标「需客户确认」，并列入附录。
 

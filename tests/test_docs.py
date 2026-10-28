@@ -12,7 +12,8 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 SKILL = REPO / "skills" / "booth-proposal"
 SCRIPTS = SKILL / "scripts"
-REFS = ["1-brief.md", "2-frame.md", "3-ideas.md", "4-renders.md", "5-develop.md", "6-proposal.md", "review.md"]
+REFS = ["1-brief.md", "2-frame.md", "3-ideas.md", "4-renders.md", "5-develop.md", "6-proposal.md", "arch-showcase.md",
+        "arch-tender.md", "review.md"]
 OLD_REFS = ["art-direction.md", "content-strategy.md", "frame.md", "image-prompts.md", "layout-card.md",
             "proposal-deck.md", "proposal-pack.md", "requirement-card.md", "style-card.md", "venue-card.md"]
 SCRIPTS_CMDS = ["render", "gates", "deck", "booth_geometry", "draw_plan"]
@@ -23,9 +24,11 @@ DOCS = ["SKILL.md"] + ["references/" + r for r in REFS]
 ANCHORS = {
     "SKILL.md": ["gates.py select", "step mode", "one stop", "--chosen-all", "## Reference sets", "input/refs/",
                  "concepts/<set>/<concept>/", "brief/selection.json", "pack/proposal.html", "deck.py export",
-                 "--project", "render.py import", "OPENAI_API_KEY", "work/"],
+                 "--project", "render.py import", "OPENAI_API_KEY", "work/", "start [architecture]",
+                 "architecture <id>", "gates.py architectures", "references/arch-tender.md", "no figures"],
     "references/1-brief.md": ["brief/brief.json", "gates.py brief", "design_points", "claims", "protected_terms",
-                              "do_not_mention", "gates.py report brief", "exhibitor manual"],
+                              "do_not_mention", "gates.py report brief", "exhibitor manual", "proposal.architecture",
+                              "clauses[]", "deliverables[]", "graphics[]", "graphic-ref", "clause-kind"],
     "references/2-frame.md": ["gates.py frame", "booth.program", "Area budget", "Depth budget", "height_zones",
                               "rigging_allowed"],
     "references/3-ideas.md": ["brief/ideas.json", "booth_type", "a gate you walk through", "gates.py brief --stamp",
@@ -33,16 +36,23 @@ ANCHORS = {
     "references/4-renders.md": ["--dry-run", "401", "403", "429", "400", "Never start a second call",
                                 "| Problem | Correction sentence |", "Known habits", "render.py lint",
                                 "render.py import", "render.py tiles", "render.py sheet", "render.py logo",
-                                "assets/prompts/fixed.json", "fix_max", "timeout"],
+                                "assets/prompts/fixed.json", "fix_max", "timeout", "## Graphics", "render.py graphic",
+                                "--mode graphic", "import FILE --graphic", "sheet --graphics"],
     "references/5-develop.md": ["booth_geometry.py check", "draw_plan.py plan", "booth_geometry.py facts",
                                 "envelope_override", "gates.py concepts", "massing", "geometry_tol"],
     "references/6-proposal.md": ["deck/storyboard.md", "deck.py layouts --emit", "deck.py check --json",
                                  "deck.py render", "deck.py text --diff", "deck.py review --record",
                                  "deck.py export", "data-role", "data-claim", "data-ref", "figure.render",
-                                 "work/deck-review.input.json", "pack/proposal.pdf"],
+                                 "work/deck-review.input.json", "pack/proposal.pdf", "data-chapter", "data-clause",
+                                 "data-deliverable", "figure.graphic", "--chapter ID"],
+    "references/arch-tender.md": ["data-clause", "data-deliverable", "statement:separate", "data-ref=\"separate\"",
+                                  "deck.py layouts --emit graphic --graphic", "gates.py architectures",
+                                  "| `separate` |", "Storyboard example"],
+    "references/arch-showcase.md": ["proposal.architecture", "data-concept", "## Compare", "## Appendix",
+                                    "appendix_pages_max", "D-IMG-FORBIDDEN", "Storyboard"],
     "references/review.md": ["legible_text", "logo_like", "pseudo_text", "composited_logo", "premium",
                              "render.py review", "--scope full", "Pass 1", "Pass 2", "\"self\"", "render.py sheet",
-                             "work/deck-review.input.json"],
+                             "work/deck-review.input.json", "pasted_photo", "--text-area yes", "legibility"],
 }
 STALE = ["--out-dir", "check.txt", "pack/preview", "pack/boards", "deck-backups", "A-1-hero", "A-2-front",
          "Do-not-mention", "style-cards.md", "design-points.md", "deck/plan.json", "deck_build", "View 1", "View 2",
@@ -110,7 +120,7 @@ def test_reference_files_exact():
 def test_word_budgets():
     assert words(doc_text("SKILL.md")) <= 1800
     total = sum(words(doc_text("references/" + r)) for r in REFS)
-    assert total <= 12000, total
+    assert total <= 13500, total   # 0.7.0: two architecture files, clauses, graphics
 
 
 def test_skill_md_frontmatter():

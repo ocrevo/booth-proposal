@@ -5,7 +5,7 @@ Each folder is one scenario:
 - `prompt.md`: a settings block (`tags`, `max_turns`, `timeout_seconds`, `allowed_tools`), then what the user types, then an `Input files:` line.
 - `case.yaml`: the expected outcome in prose; `context.scaffold_script` when the case has inputs.
 - `graders/NN-slug.md`: one pass/fail statement per file, judged on the trace and the files the run wrote.
-- `files/`: the inputs, copied into an empty workspace by `place-files.sh`. Fixture cases also hold a project folder (`brief/`, `concepts/`, sometimes `pack/` and `deck/`) finished up to a given step.
+- `files/`: the inputs, copied into an empty workspace by `place-files.sh`. Fixture cases also hold a project folder (`brief/`, `concepts/`, sometimes `graphics/`, `incoming/`, `pack/` and `deck/`) finished up to a given step. A fixture brief names `proposal.architecture` only when the case needs it (`showcase` for the cases that build or hold a design-showcase deck); otherwise the default architecture, `tender`, applies.
 
 Every case also has deterministic checks in `tools/eval_checks.json`; `tools/eval_grade.py` runs them with the skill's own commands.
 
@@ -23,7 +23,9 @@ Every case also has deterministic checks in `tools/eval_checks.json`; `tools/eva
 | paraphrased-narration | The proposal check and Pass 1 remove narration of a reference, including a paraphrase no word list catches; brand language is kept; a reference photo and a `data:` image are removed before export | fixture up to step 5 with a draft deck | no |
 | no-key | Without an API key: prompts written and linted, no paid call, key and import instructions, `start` ends after step 4 | RFP, one reference set | no |
 | chatgpt-import | Images made elsewhere enter with `render.py import`; a copy of a reference is refused (R-SOURCE); review before choosing; stop for `select` | fixture up to step 3 plus `incoming/` | no |
-| multi-set-free-selection | Free selection across two sets with a lead; only selected concepts developed and shown; storyboard first; two review passes; claims signed off; no internal text; send only the PDF | fixture up to step 4 | no |
+| multi-set-free-selection | Free selection across two sets with a lead, in the showcase architecture the prompt asks for; only selected concepts developed and shown; storyboard first; two review passes; claims signed off; no internal text; send only the PDF | fixture up to step 4 | no |
+| tender-default | A numbered tender (one mixed design and execution clause, a price clause, an unnumbered must-contain list with one graphic) and no architecture named: the default tender architecture is used; chapters present; clause and deliverable table complete with page references; a separate page lists schedule, staffing and price items without figures; the graphic is imported and reviewed, placed with text set over it in HTML | fixture up to step 3 plus `incoming/` (renders and a graphic) | no |
+| showcase-explicit | The same tender, and the prompt asks for the showcase architecture: it is written to brief.json and the deck is a design narrative; no separate page, no clause rows, no graphic made or placed | fixture up to step 3 plus `incoming/` | no |
 
 Only `reference-first` makes paid image calls: chosen ideas × `candidates_per_concept` (2) images at about `seconds_per_image` (100 s) each, plus up to `fix_max` fixes per concept. Run every other case in a workspace without `OPENAI_API_KEY`, so that no case can spend money by mistake.
 

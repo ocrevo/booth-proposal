@@ -8,7 +8,7 @@
     {
       "name": "booth-proposal",
       "source": "./",
-      "description": "Turn a booth RFP and sets of reference photos into art-directed, reviewed booth concepts and a client-ready proposal PDF"
+      "description": "Turn a booth RFP and sets of reference photos into art-directed, reviewed booth concepts and a client-ready proposal PDF in a selectable architecture (tender response by default, or design showcase)"
     }
   ]
 }

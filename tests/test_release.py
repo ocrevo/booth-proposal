@@ -72,9 +72,9 @@ def test_dist_is_current(tmp_path):
 def test_release_metadata():
     plugin = json.loads(read(REPO / ".claude-plugin" / "plugin.json"))
     market = json.loads(read(REPO / ".claude-plugin" / "marketplace.json"))
-    assert plugin["version"] == "0.6.0"
+    assert plugin["version"] == "0.7.0"
     first = next(ln for ln in read(REPO / "CHANGELOG.md").split("\n") if ln.startswith("## "))
-    assert first.startswith("## 0.6.0 – ")
+    assert first.startswith("## 0.7.0 – ")
     yaml_text = read(REPO / "skills" / "booth-proposal" / "agents" / "openai.yaml")
     short = re.search(r'short_description:\s*"([^"]*)"', yaml_text).group(1)
     for d in [plugin["description"], market["plugins"][0]["description"], short]:

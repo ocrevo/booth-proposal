@@ -39,7 +39,7 @@
     {
       "id": "understanding",
       "title": {
-        "en": "Understanding the brief",
+        "en": "The brief",
         "zh": "项目理解"
       },
       "purpose": "The project and the event recapped, the stand space (optionally pack/site.svg), the requirements in plain words.",

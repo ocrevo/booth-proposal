@@ -1,6 +1,6 @@
 # Step 1 – Brief
 
-The brief is what the client asked for, in a form the gates can read. The data lives in `brief/brief.json`; the reading notes (`brief/*.md`) are free text for you and are never parsed. Commands run from the project folder; `scripts/` is this skill's scripts folder.
+The brief is what the client asked for, in a form the gates can read. The data lives in `brief/brief.json`; the reading notes (`brief/*.md`) are free text for you and are never parsed.
 
 ## Steps
 
@@ -23,6 +23,10 @@ The brief is what the client asked for, in a form the gates can read. The data l
 | `design_points[]` | `{id, type, text, source}` | yes | `id` `^D\d+$`; `source` non-empty |
 | `claims[]` | `{id, text, flag, source, keys?}` | yes (may be `[]`) | `id` `^C\d+$`; `flag` true = needs client sign-off; `keys` extra match phrases (each ≥2 characters) |
 | `assumptions[]` | `{id, text, impact}` | no | `id` `^A\d+$`; `impact` `"high"`\|`"low"` |
+| `proposal.architecture` | string | no | from `gates.py architectures`; default `tender` |
+| `clauses[]` | `{n, title?, text, source, kind, points?}` | no | below |
+| `deliverables[]` | `{id, title, kind, source, points?}` | no | `id` `^DL\d+$` |
+| `graphics[]` | `{id, title, purpose, ratio, refs?, content?}` | no | `id` `^GR\d+$` |
 | `references` | `{sets: [{id, dir, files: [{path, sha256}]}], stamped_at}` | code | `gates.py brief --stamp` only; sets sorted by id, files by path |
 
 ```json
@@ -39,15 +43,29 @@ The brief is what the client asked for, in a form the gates can read. The data l
 - Never write `references` by hand: it holds file hashes, and a hand edit makes `G-REFS` report it stale.
 - `booth.unit` is the RFP's unit. Notes give the other system in brackets: 6 m × 3 m (19.7 × 9.8 ft). Copy numbers exactly as written.
 
+## Clauses, deliverables and graphics
+
+The tender architecture builds chapters, the separate page and the response table from these (arch-tender.md).
+
+- `clauses[]`: one per numbered requirement. `n`: the tender's own number as a string (`"2"`, `"8.1"`, `"3a"`), unique; it may show. `text` in plain words; `source`. `kind`: `design`, `interaction`, `graphics`, `material`, `hospitality`, `execution`, `price` or `other`, or a list for a mixed clause (`["design", "execution"]`). `points`: the design points it asks for. `title`, optional, no digits; needed when a separately submitted clause's text has a digit (the separate page lists the title, else the text).
+- `deliverables[]`: unnumbered "the proposal must contain" items: `id` `DL1`…, `title` (no digits), `kind`, `source`, optional `points`.
+- `graphics[]`: each graphic the tender asks the studio to design (a wall panel): `title`, `purpose`, `ratio` (`2:3`, `16:9`); `refs`, product photos in `input/` to redraw from, never shown; `content`, the claim ids its words may use. Made in `graphics/<id>/` (4-renders.md).
+- Put every design point in the `points` of a clause or deliverable (else warning `coverage`).
+
+```json
+"clauses": [{"n": "7", "title": "Build schedule", "text": "Build schedule in 3 phases", "source": "Tender p.4 item 7", "kind": "execution"}],
+"graphics": [{"id": "GR1", "title": "Fleet story", "purpose": "Back wall panel", "ratio": "2:3", "refs": ["input/product.png"], "content": ["C2"]}]
+```
+
 ## Requirement notes
 
-`brief/requirement-card.md`: what the client asked, one requirement per row, each with its source; free notes, never parsed. Hard = the RFP says it must be done or provided (size, height limit, dates, deliverables); soft = theme, style, tone. Ids: only `D`, `C`, `A` (in brief.json) and `I` (in ideas.json); cite the source text for anything else. Cover: project (event, organiser, client, venue), dates (conference and exhibition days apart), booth (copied to `brief.json booth`), hard and soft requirements, the design brief (audience, what visitors should feel and remember, brand character in three or four words), deliverables (price is never in the proposal), brand (logo files, colours, mandatory messages). Write in the user's language, with short original quotes where wording matters. The proposal takes only the event facts from these notes.
+`brief/requirement-card.md`: what the client asked, one requirement per row with its source; free notes, never parsed. Hard = the RFP says it must be done or provided (size, height, dates, deliverables); soft = theme, style, tone. Cite brief.json and ideas.json items by id; anything else by its source text. Cover: project (event, organiser, client, venue), dates (conference and exhibition days apart), booth, hard and soft requirements, the design brief (audience, what visitors should feel and remember, brand character in three or four words), deliverables, brand (logo files, colours, mandatory messages). Write in the user's language, with short original quotes where wording matters.
 
 ## Venue notes
 
-`brief/venue-card.md` collects the physical and regulatory limits, mostly from the venue's exhibitor manual, not the RFP. Without the manual, assume a sensible value for each missing item, record it as an assumption marked "check exhibitor manual" for the user to confirm with the organiser. Never state a venue rule from general knowledge as if it were confirmed.
+`brief/venue-card.md` collects the physical and regulatory limits, mostly from the venue's exhibitor manual. Without the manual, assume a sensible value for each missing item and record it as an assumption marked "check exhibitor manual"; never state a venue rule from general knowledge as confirmed.
 
-Look for: booth types (inline, corner, peninsula, island) and the rules for each, including wall height near aisles and neighbours; height limits for structures, graphics and hanging signs; rigging rules and who may install it; fire-retardant certification for fabrics, wood and other materials; electrical ordering deadlines and connection rules; food and beverage rules, especially serving coffee or snacks; audio volume limits and screen placement; build and dismantle times and who may work on the stand; floor load and whether the floor may be drilled or taped. The card is reused across runs: update it only when a manual or a confirmed answer arrives. These feed `brief.json booth` (`max_height`, `rigging_allowed`) and, in step 5, each geometry spec (`height_zones`, `walkway`, `headroom`).
+Look for: booth types and their rules (wall height near aisles and neighbours); height limits for structures, graphics and hanging signs; rigging; fire-retardant certification; electrical deadlines; food and beverage rules; audio and screen limits; build and dismantle times; floor load and fixing. The card is reused across runs: update it only when a manual or a confirmed answer arrives. These feed `brief.json booth` (`max_height`, `rigging_allowed`) and, in step 5, each geometry spec (`height_zones`, `walkway`, `headroom`).
 
 ## Content inventory
 
@@ -78,9 +96,9 @@ python scripts/gates.py report brief
 
 `--stamp` rewrites `references` from the folders on disk, then the gate checks the file. Exit 1 on:
 
-- `G-BRIEF`: a required field missing or invalid (`field`), an id duplicated or off its pattern (`id`), a design point or claim without `source` (`source`), a `do_not_mention` entry under two characters (`dnm`), no `assets/labels/<lang>.json` (`labels`).
+- `G-BRIEF`: a required field missing or invalid (`field`), an id duplicated or off its pattern (`id`), an item without `source` (`source`), a `do_not_mention` entry under two characters (`dnm`), no `assets/labels/<lang>.json` (`labels`); an unknown architecture in brief.json or deck-style (`architecture`, listing the known ones); a clause number off the pattern or repeated (`clause-n`); an unknown kind (`clause-kind`); an unknown design point (`points`); a title with a digit, or missing (`title`); a `ratio` not like `2:3` (`ratio`); a ref that is no file in `input/` (`graphic-ref`); an unknown claim (`content`). Warning `coverage`: a design point in no clause or deliverable (clause architectures only).
 - `G-REFS`: an invalid set name, an empty set folder, or `stale`: the stamped sets differ from the disk. Run `--stamp` again after any change to `input/refs/`.
 
-`C-LEGACY` warns when there is no `input/refs/`: every image directly in `input/` becomes one set, `_legacy`. Move the photos into `input/refs/<set>/`.
+`C-LEGACY` warns when there is no `input/refs/` (SKILL.md, `## Reference sets`).
 
-`gates.py report brief` prints the design points, the high-impact assumptions and the claims awaiting sign-off: what the user sees of this step. Add one line on the assumption that could change the design most.
+`gates.py report brief` prints the design points, the high-impact assumptions and the claims awaiting sign-off; add one line on the assumption that could change the design most.

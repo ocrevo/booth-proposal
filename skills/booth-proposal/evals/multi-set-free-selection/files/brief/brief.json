@@ -101,6 +101,9 @@
       "impact": "high"
     }
   ],
+  "proposal": {
+    "architecture": "showcase"
+  },
   "references": {
     "sets": [
       {

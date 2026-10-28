@@ -2,8 +2,9 @@ schema_version: "1.1"
 name: multi-set-free-selection
 expected_outcome: |
   Two reference sets (ref-north, ref-grove) with concepts A and B in each; every chosen render has a current full
-  passing review. The user selects ref-grove/B and ref-north/A, with ref-north/A as lead. The skill runs
-  `gates.py select ref-grove/B ref-north/A --lead ref-north/A` (display letters: ref-grove/B is A, ref-north/A is B),
+  passing review. brief.json names the design showcase architecture (`proposal.architecture: "showcase"`), as the user
+  asks, so the deck is a design narrative with no separate-submission page. The user selects ref-grove/B and ref-north/A, with
+  ref-north/A as lead. The skill runs `gates.py select ref-grove/B ref-north/A --lead ref-north/A` (display letters: ref-grove/B is A, ref-north/A is B),
   develops only these two concepts (geometry.json, `booth_geometry.py check`, `draw_plan.py plan`, `gates.py concepts`),
   shows the storyboard table (deck/storyboard.md) before writing any HTML, and builds pack/proposal.html from the
   template with only the two selected concepts and ref-north/A as the recommended lead. Flagged claims carry the

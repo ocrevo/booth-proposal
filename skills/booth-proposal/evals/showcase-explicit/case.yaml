@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: showcase-explicit
+expected_outcome: |
+  The same numbered Nordvik tender and project as tender-default (clauses, deliverables, one requested graphic GR1, no
+  architecture named in brief.json), but the user asks for the design showcase architecture. The skill writes
+  `proposal.architecture: "showcase"` in brief.json (the `architecture` command) and runs `gates.py brief` before the
+  deck is built. It imports and reviews the two concept renders and runs `gates.py select set-1/A set-1/B --lead
+  set-1/A`. It does not make or import the graphic: showcase shows no graphics (`render.py import --graphic` is
+  refused with C-INPUT) and the user is told that graphics belong to the tender architecture. `deck.py new` writes
+  only the cover; the deck is a design narrative (the optional chapters of the showcase architecture, a board and a
+  plan per selected concept, a compare page, the lead annotated, an appendix response table by design point and the
+  sign-off list when flagged claims are used). It has no page about what is submitted separately, no clause or
+  deliverable rows, no graphic page and no schedule, staffing or price. The deck passes `deck.py check`, is rendered
+  and reviewed in two passes, and pack/proposal.pdf is exported. No reference photo and no sentence about a reference
+  appears in the proposal. The user is told to send only the PDF.
+context:
+  scaffold_script: place-files.sh

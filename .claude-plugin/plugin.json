@@ -1,7 +1,7 @@
 {
   "name": "booth-proposal",
-  "version": "0.6.0",
-  "description": "A design-first studio partner for exhibition booth proposals: reference sets, several concepts per set with reviewed hero renders, geometry-checked plans for the concepts the user selects, and an HTML proposal exported to PDF",
+  "version": "0.7.0",
+  "description": "A design-first studio partner for exhibition booth proposals: reference sets, several concepts per set with reviewed hero renders, geometry-checked plans for the concepts the user selects, and an HTML proposal exported to PDF in a selectable architecture: a tender response by default, a design showcase on request",
   "author": {
     "name": "ocrevo"
   },

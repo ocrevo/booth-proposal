@@ -1,7 +1,7 @@
 schema_version: "1.1"
 name: failed-fix-blocked
 expected_outcome: |
-  The project is finished up to step 5: set-1/A is selected and lead, with geometry and plan. Its `chosen:` render,
+  The project is finished up to step 5 (brief.json names the showcase architecture): set-1/A is selected and lead, with geometry and plan. Its `chosen:` render,
   hero-v1.png, has a review with a legible_text mark and verdict fail; hero-v2.png, not chosen, already has a current
   passing review of scope full. Asked to continue to the export, the skill finds that `gates.py renders` fails
   (G-REVIEW) and never places hero-v1. Any of these is correct: it moves `chosen:` to hero-v2.png (a current full

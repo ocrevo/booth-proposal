@@ -1,0 +1,218 @@
+{
+  "schema": "brief/2",
+  "lang": "en",
+  "client": {
+    "names": [
+      "Nordvik Ferries",
+      "Nordvik"
+    ]
+  },
+  "protected_terms": [
+    "Tidewater Pass"
+  ],
+  "do_not_mention": [
+    "last season's stand"
+  ],
+  "booth": {
+    "unit": "m",
+    "width": 8,
+    "depth": 6,
+    "max_height": 4.5,
+    "open_sides": [
+      "front",
+      "right"
+    ],
+    "source": "Tender, Event and stand",
+    "rigging_allowed": null
+  },
+  "design_points": [
+    {
+      "id": "D1",
+      "type": "space",
+      "text": "Open, walk-in stand with a clear entrance",
+      "source": "Tender item 2"
+    },
+    {
+      "id": "D2",
+      "type": "theme",
+      "text": "Crossings made calm",
+      "source": "Tender item 2"
+    },
+    {
+      "id": "D3",
+      "type": "function",
+      "text": "Tidewater Pass sign-up counter",
+      "source": "Tender item 3"
+    },
+    {
+      "id": "D4",
+      "type": "media",
+      "text": "Large screen for route films",
+      "source": "Tender item 3"
+    },
+    {
+      "id": "D5",
+      "type": "product",
+      "text": "An area where visitors try the Tidewater Pass app",
+      "source": "Tender item 5"
+    },
+    {
+      "id": "D6",
+      "type": "function",
+      "text": "Lounge that seats eight",
+      "source": "Tender item 8"
+    }
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "text": "14 hybrid vessels in service",
+      "flag": true,
+      "source": "Fleet brochure p.4"
+    },
+    {
+      "id": "C2",
+      "text": "The first fully electric car ferry on the northern coast",
+      "flag": true,
+      "source": "Fleet brochure p.4"
+    },
+    {
+      "id": "C3",
+      "text": "Founded in 1931",
+      "flag": false,
+      "source": "Fleet brochure p.2"
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A1",
+      "text": "The open sides are front and right; the organiser has not confirmed them",
+      "impact": "high"
+    },
+    {
+      "id": "A2",
+      "text": "Nothing may be hung from the hall ceiling until the organiser confirms rigging",
+      "impact": "high"
+    }
+  ],
+  "clauses": [
+    {
+      "n": "2",
+      "text": "An open, walk-in stand with a clear entrance, in the spirit of crossings made calm",
+      "source": "Tender item 2",
+      "kind": "design",
+      "points": [
+        "D1",
+        "D2"
+      ]
+    },
+    {
+      "n": "3",
+      "text": "A Tidewater Pass sign-up counter and a large screen for route films",
+      "source": "Tender item 3",
+      "kind": "design",
+      "points": [
+        "D3",
+        "D4"
+      ]
+    },
+    {
+      "n": "5",
+      "text": "An area where visitors try the Tidewater Pass app",
+      "source": "Tender item 5",
+      "kind": "interaction",
+      "points": [
+        "D5"
+      ]
+    },
+    {
+      "n": "7.1",
+      "text": "An overall price and an itemised price",
+      "title": "Overall and itemised price",
+      "source": "Tender item 7.1",
+      "kind": "price",
+      "points": []
+    },
+    {
+      "n": "8",
+      "text": "Lounge furniture for eight, supplied and delivered to the hall by the bidder",
+      "title": "Lounge furniture and its delivery",
+      "source": "Tender item 8",
+      "kind": [
+        "design",
+        "execution"
+      ],
+      "points": [
+        "D6"
+      ]
+    }
+  ],
+  "deliverables": [
+    {
+      "id": "DL1",
+      "title": "Design scheme with renderings and floor plan",
+      "kind": "design",
+      "points": [
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "source": "Tender, the proposal must contain"
+    },
+    {
+      "id": "DL2",
+      "title": "Graphic design of the back wall panel",
+      "kind": "graphics",
+      "points": [],
+      "source": "Tender, the proposal must contain"
+    },
+    {
+      "id": "DL3",
+      "title": "Build schedule and on-site headcount",
+      "kind": "execution",
+      "points": [],
+      "source": "Tender, the proposal must contain"
+    },
+    {
+      "id": "DL4",
+      "title": "Itemised price",
+      "kind": "price",
+      "points": [],
+      "source": "Tender, the proposal must contain"
+    }
+  ],
+  "graphics": [
+    {
+      "id": "GR1",
+      "title": "Fleet story",
+      "purpose": "A back wall panel that tells the story of the fleet",
+      "ratio": "2:3",
+      "refs": [],
+      "content": [
+        "C3"
+      ]
+    }
+  ],
+  "references": {
+    "sets": [
+      {
+        "id": "set-1",
+        "dir": "input/refs/set-1",
+        "files": [
+          {
+            "path": "input/refs/set-1/r01.png",
+            "sha256": "72c694b0d22b532311f373726e1bad97ced8d7d34364025a4d1ef175b45bc1e6"
+          },
+          {
+            "path": "input/refs/set-1/r02.png",
+            "sha256": "87a98198a0a3fb050d8c5c53e0eda7ff3ac4d2d236ac957c92cb7b44833a4bba"
+          }
+        ]
+      }
+    ],
+    "stamped_at": "2026-10-01T09:00:01+02:00"
+  }
+}

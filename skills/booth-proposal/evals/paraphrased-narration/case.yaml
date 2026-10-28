@@ -1,7 +1,7 @@
 schema_version: "1.1"
 name: paraphrased-narration
 expected_outcome: |
-  A draft English proposal for the selected concept set-1/A narrates the reference in five planted sentences:
+  A draft English proposal (showcase architecture, named in brief.json) for the selected concept set-1/A narrates the reference in five planted sentences:
   P1 "This time the hull wall goes deeper and brighter than before.", P2 "Visitors who knew the old blue hull will feel
   at home.", P3 "We kept the familiar curve and made it calmer.", P4 "It builds on the stand people already know." and
   P5 "The palette carries forward Nordvik's Signal Yellow.". It also places a reference photo in a figure.pic

@@ -33,12 +33,15 @@
       {"id": "failed-fix-blocked-01", "type": "unchanged", "path": "concepts/set-1/A/renders/hero-v1.review.json"},
       {"id": "failed-fix-blocked-02", "type": "command", "argv": ["{py}", "{scripts}/gates.py", "renders", "--json", "--project", "{ws}"], "exit": [0]},
       {"id": "failed-fix-blocked-03", "type": "check_clean"},
-      {"id": "failed-fix-blocked-04", "type": "exists", "path": "pack/proposal.pdf"}
+      {"id": "failed-fix-blocked-04", "type": "exists", "path": "pack/proposal.pdf"},
+      {"id": "failed-fix-blocked-05", "type": "json_equals", "path": "brief/brief.json", "key": "proposal.architecture", "value": "showcase"},
+      {"id": "failed-fix-blocked-06", "type": "text", "absent": ["The schedule, on-site staffing and pricing are submitted separately."]}
     ],
     "paraphrased-narration": [
       {"id": "paraphrased-narration-01", "type": "text", "absent": ["This time the hull wall goes deeper and brighter than before.", "Visitors who knew the old blue hull will feel at home.", "We kept the familiar curve and made it calmer.", "It builds on the stand people already know."], "present": ["Signal Yellow"]},
       {"id": "paraphrased-narration-02", "type": "check_clean", "codes": ["D-IMG-FORBIDDEN", "D-IMG-URL", "D-TXT-REFERENCE"]},
-      {"id": "paraphrased-narration-03", "type": "exists", "path": "work/deck-review.json"}
+      {"id": "paraphrased-narration-03", "type": "exists", "path": "work/deck-review.json"},
+      {"id": "paraphrased-narration-04", "type": "json_equals", "path": "brief/brief.json", "key": "proposal.architecture", "value": "showcase"}
     ],
     "no-key": [
       {"id": "no-key-01", "type": "absent", "path": "brief/selection.json"},
@@ -65,7 +68,38 @@
       {"id": "multi-set-free-selection-10", "type": "pack_only"},
       {"id": "multi-set-free-selection-11", "type": "exists", "path": "pack/proposal.pdf"},
       {"id": "multi-set-free-selection-12", "type": "exists", "path": "deck/storyboard.md"},
-      {"id": "multi-set-free-selection-13", "type": "exists", "path": "work/deck-review.json"}
+      {"id": "multi-set-free-selection-13", "type": "exists", "path": "work/deck-review.json"},
+      {"id": "multi-set-free-selection-14", "type": "json_equals", "path": "brief/brief.json", "key": "proposal.architecture", "value": "showcase"}
+    ],
+    "tender-default": [
+      {"id": "tender-default-01", "type": "command", "argv": ["{py}", "{scripts}/gates.py", "brief", "--json", "--project", "{ws}"], "exit": [0]},
+      {"id": "tender-default-02", "type": "command", "argv": ["{py}", "{scripts}/gates.py", "architectures", "--json", "--project", "{ws}"], "exit": [0]},
+      {"id": "tender-default-03", "type": "text", "present": ["Submitted separately", "The schedule, on-site staffing and pricing are submitted separately."]},
+      {"id": "tender-default-04", "type": "check_clean", "codes": ["D-STRUCT", "D-NUMBER", "D-REF", "D-PLACE", "D-IMG-RENDER", "D-IMG-FORBIDDEN", "D-TXT-INTERNAL", "D-TXT-REFERENCE"]},
+      {"id": "tender-default-05", "type": "json_equals", "path": "concepts/set-1/A/renders/hero-v1.json", "key": "mode", "value": "import"},
+      {"id": "tender-default-06", "type": "json_equals", "path": "concepts/set-1/B/renders/hero-v1.json", "key": "mode", "value": "import"},
+      {"id": "tender-default-07", "type": "json_equals", "path": "graphics/GR1/renders/graphic-v1.json", "key": "mode", "value": "import"},
+      {"id": "tender-default-08", "type": "json_equals", "path": "graphics/GR1/renders/graphic-v1.json", "key": "kind", "value": "graphic"},
+      {"id": "tender-default-09", "type": "json_equals", "path": "brief/selection.json", "key": "selected", "value": ["set-1/A", "set-1/B"]},
+      {"id": "tender-default-10", "type": "json_equals", "path": "brief/selection.json", "key": "lead", "value": "set-1/A"},
+      {"id": "tender-default-11", "type": "command", "argv": ["{py}", "{scripts}/gates.py", "renders", "--json", "--project", "{ws}"], "exit": [0]},
+      {"id": "tender-default-12", "type": "pack_only"},
+      {"id": "tender-default-13", "type": "exists", "path": "pack/proposal.pdf"},
+      {"id": "tender-default-14", "type": "exists", "path": "deck/storyboard.md"},
+      {"id": "tender-default-15", "type": "exists", "path": "work/deck-review.json"}
+    ],
+    "showcase-explicit": [
+      {"id": "showcase-explicit-01", "type": "json_equals", "path": "brief/brief.json", "key": "proposal.architecture", "value": "showcase"},
+      {"id": "showcase-explicit-02", "type": "command", "argv": ["{py}", "{scripts}/gates.py", "brief", "--json", "--project", "{ws}"], "exit": [0]},
+      {"id": "showcase-explicit-03", "type": "text", "absent": ["Submitted separately", "The schedule, on-site staffing and pricing are submitted separately."]},
+      {"id": "showcase-explicit-04", "type": "check_clean", "codes": ["D-STRUCT", "D-PLACE", "D-IMG-RENDER", "D-IMG-FORBIDDEN", "D-TXT-INTERNAL", "D-TXT-REFERENCE"]},
+      {"id": "showcase-explicit-05", "type": "absent", "path": "graphics/*/renders/*"},
+      {"id": "showcase-explicit-06", "type": "json_equals", "path": "brief/selection.json", "key": "selected", "value": ["set-1/A", "set-1/B"]},
+      {"id": "showcase-explicit-07", "type": "json_equals", "path": "brief/selection.json", "key": "lead", "value": "set-1/A"},
+      {"id": "showcase-explicit-08", "type": "pack_only"},
+      {"id": "showcase-explicit-09", "type": "exists", "path": "pack/proposal.pdf"},
+      {"id": "showcase-explicit-10", "type": "exists", "path": "deck/storyboard.md"},
+      {"id": "showcase-explicit-11", "type": "exists", "path": "work/deck-review.json"}
     ]
   }
 }

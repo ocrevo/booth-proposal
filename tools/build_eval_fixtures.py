@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Build the generated files of the eval cases (images and, for the four fixture cases, a finished project folder).
+"""Build the generated files of the eval cases (images and, for the fixture cases, a finished project folder).
 
 Usage: python tools/build_eval_fixtures.py (--case NAME | --all)
 
 Writes only below skills/booth-proposal/evals/<case>/files/ and only these paths: input/refs/, input/nordvik-logo.png,
-brief/, concepts/, deck/, pack/, incoming/. The hand-written input/rfp.md and input/brochure.md are never touched.
+brief/, concepts/, graphics/, deck/, pack/, incoming/. The hand-written input/rfp.md and input/brochure.md are never touched.
 
 Images are synthetic Pillow drawings (no text, no glyphs) with a fixed seed per file. The Nordvik fixtures are built in a
 temporary folder by the real command line tools (gates.py, render.py import and review, booth_geometry.py,
@@ -49,7 +49,7 @@ PHOTO_SIZE = (1024, 683)
 RENDER_SIZE = (1536, 1024)
 
 # paths below files/ that this tool owns (everything else, e.g. input/rfp.md, belongs to the case author)
-OWNED = ("input/refs", "input/nordvik-logo.png", "brief", "concepts", "deck", "pack", "incoming")
+OWNED = ("input/refs", "input/nordvik-logo.png", "brief", "concepts", "graphics", "deck", "pack", "incoming")
 
 
 # ---------------------------------------------------------------- synthetic images (no text, no glyphs)
@@ -199,6 +199,44 @@ def make_logo(key: str) -> Image.Image:
     return img
 
 
+def make_graphic(key: str) -> Image.Image:
+    """A 1024x1536 portrait wall-panel artwork: a calm, plain pale field in the top third (kept empty for the text),
+    layered paper-cut hills, a sun, sea and a ferry below. No letters, no digits, no logo."""
+    r = _rng(key)
+    w, h_ = 1024, 1536
+    img = Image.new("RGB", (w, h_), (238, 234, 222))
+    d = ImageDraw.Draw(img)
+    edge = 520                                                    # the top of the subject; everything above stays plain
+    for y in range(edge, h_):                                     # dawn sky, warmer towards the horizon
+        d.line([(0, y), (w, y)], fill=_mix((238, 234, 222), (246, 208, 150), (y - edge) / (h_ - edge) * 0.9))
+    navy, yellow = (11, 61, 92), (242, 183, 5)
+    d.ellipse([w // 2 - 130, 760 - 130, w // 2 + 130, 760 + 130], fill=_mix(yellow, (255, 255, 255), 0.15))
+    for i, (base, tone) in enumerate(((880, 0.62), (940, 0.4), (1000, 0.2))):      # three layers of hills
+        pts = [(0, base)]
+        x = 0
+        while x < w:
+            x += r.randint(90, 170)
+            pts.append((min(x, w), base - r.randint(40, 150)))
+        pts += [(w, h_), (0, h_)]
+        d.polygon(pts, fill=_mix(navy, (238, 234, 222), tone))
+    d.rectangle([0, 1080, w, h_], fill=_mix(navy, (238, 234, 222), 0.12))           # the sea
+    for i in range(7):                                                              # wake lines
+        y = 1180 + i * 46
+        d.line([(120 + i * 20, y), (w - 120 - i * 20, y)], fill=_mix(navy, (255, 255, 255), 0.45), width=4)
+    d.polygon([(250, 1040), (800, 1040), (740, 1130), (310, 1130)], fill=(250, 248, 242))   # the ferry hull
+    d.rectangle([320, 1000, 700, 1040], fill=(250, 248, 242))
+    d.rectangle([420, 960, 620, 1000], fill=yellow)
+    d.rectangle([505, 920, 535, 960], fill=navy)
+    for _ in range(3):                                                              # gulls as small arcs
+        gx, gy = r.randint(180, 840), r.randint(620, 800)
+        d.arc([gx, gy, gx + 40, gy + 24], 200, 340, fill=navy, width=4)
+        d.arc([gx + 36, gy, gx + 76, gy + 24], 200, 340, fill=navy, width=4)
+    for _ in range(1400):                                                           # fine grain, below the empty area only
+        x, y = r.randint(0, w - 1), r.randint(edge + 10, h_ - 1)
+        d.point((x, y), fill=_mix(img.getpixel((x, y)), (0, 0, 0), 0.06))
+    return img
+
+
 def save_png(img: Image.Image, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path, "PNG", optimize=False)
@@ -215,8 +253,10 @@ CLAIMS = [
 ]
 
 
-def nordvik_brief(lang: str) -> dict:
-    return {
+def nordvik_brief(lang: str, architecture: str | None = None) -> dict:
+    """The brief of the design-point cases. architecture: written as proposal.architecture; None = left to the
+    default."""
+    brief = {
         "schema": "brief/2", "lang": lang,
         "client": {"names": ["Nordvik Ferries", "Nordvik"]},
         "protected_terms": ["Tidewater Pass"],
@@ -240,6 +280,53 @@ def nordvik_brief(lang: str) -> dict:
              "impact": "high"},
         ],
     }
+    if architecture:
+        brief["proposal"] = {"architecture": architecture}
+    return brief
+
+
+def tender_brief(lang: str, architecture: str | None = None) -> dict:
+    """The brief of a numbered tender (input/rfp.md of tender-default and showcase-explicit): clauses of several
+    kinds (one mixed), the unnumbered list as deliverables, one requested graphic."""
+    brief = nordvik_brief(lang)
+    brief["booth"]["source"] = "Tender, Event and stand"
+    brief["design_points"] = [
+        {"id": "D1", "type": "space", "text": "Open, walk-in stand with a clear entrance", "source": "Tender item 2"},
+        {"id": "D2", "type": "theme", "text": "Crossings made calm", "source": "Tender item 2"},
+        {"id": "D3", "type": "function", "text": "Tidewater Pass sign-up counter", "source": "Tender item 3"},
+        {"id": "D4", "type": "media", "text": "Large screen for route films", "source": "Tender item 3"},
+        {"id": "D5", "type": "product", "text": "An area where visitors try the Tidewater Pass app",
+         "source": "Tender item 5"},
+        {"id": "D6", "type": "function", "text": "Lounge that seats eight", "source": "Tender item 8"},
+    ]
+    brief["clauses"] = [
+        {"n": "2", "text": "An open, walk-in stand with a clear entrance, in the spirit of crossings made calm",
+         "source": "Tender item 2", "kind": "design", "points": ["D1", "D2"]},
+        {"n": "3", "text": "A Tidewater Pass sign-up counter and a large screen for route films",
+         "source": "Tender item 3", "kind": "design", "points": ["D3", "D4"]},
+        {"n": "5", "text": "An area where visitors try the Tidewater Pass app", "source": "Tender item 5",
+         "kind": "interaction", "points": ["D5"]},
+        {"n": "7.1", "text": "An overall price and an itemised price", "title": "Overall and itemised price",
+         "source": "Tender item 7.1", "kind": "price", "points": []},
+        {"n": "8", "text": "Lounge furniture for eight, supplied and delivered to the hall by the bidder",
+         "title": "Lounge furniture and its delivery", "source": "Tender item 8", "kind": ["design", "execution"],
+         "points": ["D6"]},
+    ]
+    brief["deliverables"] = [
+        {"id": "DL1", "title": "Design scheme with renderings and floor plan", "kind": "design",
+         "points": ["D1", "D2", "D3", "D4", "D5", "D6"], "source": "Tender, the proposal must contain"},
+        {"id": "DL2", "title": "Graphic design of the back wall panel", "kind": "graphics", "points": [],
+         "source": "Tender, the proposal must contain"},
+        {"id": "DL3", "title": "Build schedule and on-site headcount", "kind": "execution", "points": [],
+         "source": "Tender, the proposal must contain"},
+        {"id": "DL4", "title": "Itemised price", "kind": "price", "points": [],
+         "source": "Tender, the proposal must contain"},
+    ]
+    brief["graphics"] = [{"id": "GR1", "title": "Fleet story", "purpose": "A back wall panel that tells the story of "
+                          "the fleet", "ratio": "2:3", "refs": [], "content": ["C3"]}]
+    if architecture:
+        brief["proposal"] = {"architecture": architecture}
+    return brief
 
 
 # per concept key: (name, idea sentence for ideas.json, booth type, idea line of the prompt, essentials of the prompt)
@@ -298,6 +385,28 @@ def hero_prompt(entry: tuple) -> str:
     name, _idea, _type, idea_line, essentials = entry
     fixed = json.loads((SCRIPTS.parent / "assets" / "prompts" / "fixed.json").read_text(encoding="utf-8"))
     return HERO_TEMPLATE.format(name=name, idea=idea_line, essentials=essentials, **fixed)
+
+
+GRAPHIC_TEMPLATE = """Graphic – {title}: a tall wall panel that tells the story of the ferry line to visitors at the stand.
+
+Brand colours: deep navy #0B3D5C, signal yellow #F2B705, white
+
+Composition:
+- A tall portrait panel in a flat, layered paper-cut style with soft grain.
+- The upper third is kept empty: a calm, plain field of pale cream for the title, and nothing reaches into it.
+- The subject fills the lower part, centred, with a quiet margin at every edge.
+
+Subject:
+- A modern hybrid ferry crossing a calm fjord at dawn, seen from the side, low hills behind.
+- Gulls and a soft wake; the hull panels are plain.
+{graphic_no_text}
+{graphic_text_area}
+"""
+
+
+def graphic_prompt(title: str) -> str:
+    fixed = json.loads((SCRIPTS.parent / "assets" / "prompts" / "fixed.json").read_text(encoding="utf-8"))
+    return GRAPHIC_TEMPLATE.format(title=title, **fixed)
 
 
 def ideas_json(sets: dict) -> dict:
@@ -387,12 +496,16 @@ def _write(root: Path, rel: str, data) -> None:
 
 
 def build_nordvik(dest: Path, sets: dict, upto: int, *, lang: str, case: str, renders: dict | None = None,
-                  selected: list | None = None, lead: str | None = None, with_deck: bool = False) -> None:
+                  selected: list | None = None, lead: str | None = None, with_deck: bool = False,
+                  architecture: str | None = None, brief: dict | None = None,
+                  graphic_prompts: dict | None = None) -> None:
     """Build a Nordvik project in `dest` (an empty temp folder) with the real tools, up to the end of step `upto`.
 
     sets: {set id: {concept id: entry of CONCEPTS}}; upto: 3 = prompts written (ideas scaffolded), 4 = renders imported
     and reviewed, 5 = selection, geometry and plan. renders: {concept key: [(chosen?, verdict, scope, marks) | None, ...]}
-    one tuple per hero-v<k> in order (None = imported and left unreviewed)."""
+    one tuple per hero-v<k> in order (None = imported and left unreviewed). architecture: written as
+    proposal.architecture of the brief (None = the default); brief: a ready brief instead of the design-point one;
+    graphic_prompts: {graphic id: prompt text} written to graphics/<id>/prompts/graphic.txt."""
     dest.mkdir(parents=True, exist_ok=True)
     src = dest.parent / (dest.name + "-src")                          # images "made elsewhere", outside the project
     refs_of: dict[str, list[str]] = {}
@@ -402,13 +515,15 @@ def build_nordvik(dest: Path, sets: dict, upto: int, *, lang: str, case: str, re
             rel = f"input/refs/{sid}/r{i:02d}.png"
             save_png(make_photo(f"{case}/{rel}"), dest / rel)
             refs_of[sid].append(rel)
-    common.write_json(str(dest / "brief" / "brief.json"), nordvik_brief(lang))
+    common.write_json(str(dest / "brief" / "brief.json"), brief or nordvik_brief(lang, architecture))
     run(gates, ["brief", "--stamp", "--project", str(dest)], dest)
     common.write_json(str(dest / "brief" / "ideas.json"), ideas_json(sets))
     run(gates, ["ideas", "--scaffold", "--project", str(dest)], dest)
     for sid, ents in sets.items():
         for cid, entry in ents.items():
             _write(dest, f"concepts/{sid}/{cid}/prompts/hero.txt", hero_prompt(entry))
+    for gid, text in (graphic_prompts or {}).items():
+        _write(dest, f"graphics/{gid}/prompts/graphic.txt", text)
     if upto < 4:
         return
 
@@ -568,6 +683,7 @@ def build_failed_fix_blocked(files: Path) -> list[str]:
     with frozen_env(), tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "p"
         build_nordvik(root, sets, 5, lang="zh", case="failed-fix-blocked", selected=["set-1/A"], lead="set-1/A",
+                      architecture="showcase",
                       renders={"set-1/A": [FAIL_TEXT, PASS_OTHER]})
         return copy_tree(root, files)
 
@@ -577,6 +693,7 @@ def build_paraphrased_narration(files: Path) -> list[str]:
     with frozen_env(), tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "p"
         build_nordvik(root, sets, 5, lang="en", case="paraphrased-narration", selected=["set-1/A"], lead="set-1/A",
+                      architecture="showcase",
                       renders={"set-1/A": [PASS_FULL, PASS_OTHER]}, with_deck=True)
         return copy_tree(root, files)
 
@@ -601,11 +718,40 @@ def build_multi_set(files: Path) -> list[str]:
                for sid, ents in sets.items() for cid in ents}
     with frozen_env(), tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "p"
-        build_nordvik(root, sets, 4, lang="zh", case="multi-set-free-selection", renders=renders)
+        build_nordvik(root, sets, 4, lang="zh", case="multi-set-free-selection", renders=renders,
+                      architecture="showcase")
         return copy_tree(root, files)
 
 
+def _build_tender_project(case: str, files: Path) -> list[str]:
+    """tender-default and showcase-explicit: the same numbered Nordvik tender, finished up to step 3 (prompts for two
+    concepts and for the graphic GR1) with the images made elsewhere in incoming/. No architecture is written to the
+    brief: the first case gets the default, the second is told in its prompt."""
+    sets = {"set-1": {"A": CONCEPTS["A"], "B": CONCEPTS["B"]}}
+    with frozen_env(), tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "p"
+        build_nordvik(root, sets, 3, lang="en", case=case, brief=tender_brief("en"),
+                      graphic_prompts={"GR1": graphic_prompt("Fleet story")})
+        copied = copy_tree(root, files)
+    for name in ("set-1-A-1", "set-1-A-2", "set-1-B-1"):
+        save_png(make_render(f"{case}/incoming/{name}"), files / "incoming" / f"{name}.png")
+        copied.append(f"incoming/{name}.png")
+    save_png(make_graphic(f"{case}/incoming/GR1-1"), files / "incoming" / "GR1-1.png")
+    copied.append("incoming/GR1-1.png")
+    return copied
+
+
+def build_tender_default(files: Path) -> list[str]:
+    return _build_tender_project("tender-default", files)
+
+
+def build_showcase_explicit(files: Path) -> list[str]:
+    return _build_tender_project("showcase-explicit", files)
+
+
 FIXTURES = {
+    "tender-default": build_tender_default,
+    "showcase-explicit": build_showcase_explicit,
     "failed-fix-blocked": build_failed_fix_blocked,
     "paraphrased-narration": build_paraphrased_narration,
     "chatgpt-import": build_chatgpt_import,

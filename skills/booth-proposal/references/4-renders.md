@@ -2,7 +2,7 @@
 
 The render is what the client remembers: it must hold the cover of a top studio's proposal. The image model is the strongest imagination in the process: give it the idea, the photos and the few facts that must hold, and let it design.
 
-One view per concept, the hero: `candidates_per_concept` candidates, choose one, at most `fix_max` small fixes. Render every chosen idea of every set (`gates.py ideas --scaffold` makes the folders); only the concepts the user selects are developed further. Run commands from the project folder; `scripts/` is this skill's scripts folder.
+One view per concept, the hero: `candidates_per_concept` candidates, choose one, at most `fix_max` small fixes. Render every chosen idea of every set (`gates.py ideas --scaffold` makes the folders); only the concepts the user selects are developed further.
 
 ## Prompt template
 
@@ -35,6 +35,7 @@ Rules:
 - Without reference photos, drop the last two lines.
 - Person-heights in metres ÷ 1.75; convert feet first (1 ft = 0.3048 m).
 - The four fixed sentences word for word; they are kept in `assets/prompts/fixed.json` (reference, logo panel, no lettering, do not copy).
+- Attach every photo of the concept's own set, one `--ref` per photo, and nothing else (L-REF).
 
 Example for Ostara Coffee: a 6 m × 4.4 m stand, at most 4 m high, open at the front and the left side.
 
@@ -55,11 +56,6 @@ No lettering, numbers, names, emblems or logos anywhere; screens, product labels
 The attached photos are references for form, space and mood only. Carry their design language into a new stand that is clearly more premium and refined, in the brand colours above.
 Do not copy any logo, lettering, slogan, poster or other brand from the photos, or anything from neighbouring stands.
 ```
-
-## Prompt rules
-
-- Attach every photo of the concept's own set, `input/refs/<set>/`, one `--ref` per photo, and nothing else: lint refuses another set's photo, a render, a massing image or a plan (L-REF).
-- A set gives form, space and mood; colours, logo and content are the client's.
 
 ## Lint
 
@@ -184,20 +180,51 @@ python scripts/render.py import FILE --concept set-1/A --ref input/refs/set-1/r0
 
 `render.py` stops with `R-API` (exit 3) and "No API key found". Tell the user to add `OPENAI_API_KEY=sk-…` to a `.env` file in the project folder or a parent (the search stops at a folder holding `.git`, or at home), or to set the environment variable, which wins.
 
-Meanwhile keep the prompts in `prompts/hero.txt`, give the user the `--dry-run` lines and the photos to attach, and bring in images made elsewhere with `render.py import`. With no render at all there is nothing to select: `start` ends after this step with the prompt files, the dry-run lines and the import instructions (SKILL.md, `## Start and step mode`).
+Meanwhile keep the prompt files, give the user the `--dry-run` lines and the photos to attach, and bring in images made elsewhere with `render.py import` (SKILL.md, `## Start and step mode`).
 
-## Graphic prompts
+## Graphics
 
-A graphic of `brief.json graphics` is drawn with `render.py graphic --graphic GR1 --prompt FILE --area top`; the prompt has a Graphic line, Brand colours, a Composition block that says where the empty text area is, a Subject block and these fixed sentences, copied exactly:
+The graphics of `brief.json graphics`, only in an architecture that shows them (tender; else `render.py graphic` stops with C-INPUT). Each lives in `graphics/GR1/`: `prompts/graphic.txt`, `renders/`, `graphic.md` (front matter `chosen:`, `blocked:`; made by the first call). The model draws only the artwork, never text, digits or logos; words go over its empty area in HTML, the logo is composited.
 
+Prompt, in this shape:
+
+```
+Graphic – [name, no quotes]: [what it is and where it hangs].
+
+Brand colours: [colour words with #RRGGBB]
+
+Composition:
+- [format and style, e.g. a tall panel in a flat paper-cut style].
+- The [upper third] is kept empty: a calm field of [colour] for the text, and nothing reaches into it.
+- The subject fills the [lower part], with a quiet margin at every edge.
+
+Subject:
+- [what it shows, in words].
 No text, letters, numbers, logos, emblems, signatures or watermarks anywhere in the artwork; any label, screen, sign or package in it is plain.
 The empty area for the text stays calm and plain, free of objects, patterns and fine detail, and the subject never reaches into it.
 
 The attached photos show the product only for its shape, proportions, materials and colours; redraw it in the style of this artwork, never paste or trace the photo, and leave out every label, logo and lettering on it.
+```
+
+- `--area` (`top`, `bottom`, `left`, `right`) names the side a Composition line keeps empty. Keep a margin at every edge: the deck crops to the exact ratio.
+- The hero's free-text rules apply; L-BLOCKS names `graphic`, `colours`, `composition`, `text-area`, `subject`, `no-text`, `area-sentence`, `ref-sentence`. The last sentence (`graphic_ref`) only with photos attached; `--ref` only that graphic's `refs` (L-REF `graphic`), never a render (L-REF `render`).
+
+```
+python scripts/render.py lint --mode graphic --prompt graphics/GR1/prompts/graphic.txt --graphic GR1 --area top --ref input/product.png
+python scripts/render.py graphic --graphic GR1 --prompt graphics/GR1/prompts/graphic.txt --area top --ref input/product.png --dry-run
+```
+
+The size follows the brief `ratio` (portrait `1024x1536`, square `1024x1024`, landscape `1536x1024`); `--candidates` defaults to `candidates_per_concept`. Then, as for a concept:
+
+1. `render.py tiles`, then review with `--text-area yes|no` (review.md); `python scripts/render.py sheet --graphics` goes with the boards.
+2. `chosen: renders/graphic-v2.png` in graphic.md; `python scripts/gates.py renders --graphic GR1` (G-RENDER `nochosen`, `blocked`, `refs`, `unlisted`, warning `missing` while a brief graphic has no render; G-REVIEW).
+3. Fixes: `render.py fix --graphic GR1 --base graphics/GR1/renders/graphic-v2.png --add "<one sentence>"`.
+4. Logo: `render.py logo`, the quad in a calm corner clear of the text area and the subject; blend `normal` by default.
+5. Without a key: `render.py import FILE --graphic GR1 --area top`; a copy of a product photo is refused (R-SOURCE).
 
 ## Defaults
 
-`render.py hero` and `fix` use model `gpt-image-2`, size `1536x1024` and quality `high` (`--model`, `--size`, `--quality` override them). The key is read from the environment variable `OPENAI_API_KEY`, else from a line `OPENAI_API_KEY=` or `openai_key=` (any case) in a `.env` file (`## Without a key`).
+`render.py hero`, `graphic` and `fix` use model `gpt-image-2`, size `1536x1024` (a graphic: from its ratio) and quality `high` (`--model`, `--size`, `--quality` override them). The key is read from the environment variable `OPENAI_API_KEY`, else from a line `OPENAI_API_KEY=` or `openai_key=` (any case) in a `.env` file (`## Without a key`).
 
 ## Known habits of image models
 
@@ -210,7 +237,7 @@ The attached photos show the product only for its shape, proportions, materials 
 
 ## Budget
 
-Chosen ideas × `candidates_per_concept` images, each about `seconds_per_image` seconds, plus up to `fix_max` fixes per concept. `python scripts/gates.py report ideas` prints the count and minutes; tell the user before the first call, since every image is paid.
+Chosen ideas × `candidates_per_concept` images, plus brief graphics × the same when the architecture shows them, each about `seconds_per_image` seconds, plus up to `fix_max` fixes each. `python scripts/gates.py report ideas` prints both lines; tell the user before the first call, since every image is paid.
 
 ## Optional commands
 
