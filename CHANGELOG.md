@@ -18,6 +18,7 @@
 - `docs/proposal-strategies.md`: how international exhibition and brand-experience agencies structure a proposal, with a comparison against this skill's outline.
 - README: the proposal outline and the layouts available for each page role.
 - The client-term scanner also scans `docs/`.
+- `docs/proposal-architectures.md`: a second, tender-response proposal architecture next to the design-showcase one, with a three-way comparison (current skill, a tender's structure, international practice).
 
 ## 0.5.0 – 2026-10-26
 

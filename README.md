@@ -73,7 +73,14 @@ python $S/render.py import 下载的图.png --concept set-1/A --ref input/refs/s
 
 提案只有一个来源：`pack/proposal.html`，16:9 页面，由模板的版式拼成，每一个字都由模型写在 HTML 里，再导出成 `pack/proposal.pdf`。它是设计展示：不含工程、工期、人员、报价和场馆技术事项，也不含任何内部内容（编号、出处、文件名、套名、待办、检查结果）。页面顺序只是建议，不是规定。
 
-### 提案提纲
+### 两种提案架构
+
+- **架构 A：设计展示型**，即下面的提案提纲，是 skill 现在的默认做法。
+- **架构 B：招标回应型**，章节顺序跟随招标文件，逐条回应其要求。
+
+两种架构的对比，以及与国际常见做法的三方对照，见 [docs/proposal-architectures.md](docs/proposal-architectures.md)。
+
+### 提案提纲（架构 A）
 
 建议顺序，正文约 12–16 页（细节见 [6-proposal.md](skills/booth-proposal/references/6-proposal.md)）：
 
