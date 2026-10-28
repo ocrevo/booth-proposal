@@ -1,0 +1,149 @@
+{
+  "schema": "architecture/1",
+  "id": "showcase",
+  "label": {
+    "en": "Design showcase",
+    "zh": "设计展示型"
+  },
+  "summary": {
+    "en": "A design narrative: the brief, the insight, the concepts, a comparison, the lead developed; design points answered in an appendix table.",
+    "zh": "按设计叙事展开：需求、洞察、方案、比选、主推方案深化；附录按设计要点回应。"
+  },
+  "response": "design_points",
+  "allowed_kinds": [
+    "render",
+    "plan",
+    "logo",
+    "site"
+  ],
+  "separate_submission": [],
+  "thresholds": {},
+  "chapters": [
+    {
+      "id": "cover",
+      "title": {
+        "en": "Cover",
+        "zh": "封面"
+      },
+      "purpose": "Cover and contents.",
+      "roles": [
+        "cover",
+        "agenda"
+      ],
+      "required": "never"
+    },
+    {
+      "id": "project",
+      "title": {
+        "en": "The project",
+        "zh": "项目概况"
+      },
+      "purpose": "Event facts, optionally pack/site.svg.",
+      "roles": [
+        "divider",
+        "text",
+        "materials"
+      ],
+      "required": "never"
+    },
+    {
+      "id": "brief",
+      "title": {
+        "en": "What the brief asks",
+        "zh": "需求回应"
+      },
+      "purpose": "Each design point in plain words with its page reference.",
+      "roles": [
+        "divider",
+        "response",
+        "text"
+      ],
+      "required": "never"
+    },
+    {
+      "id": "insight",
+      "title": {
+        "en": "Insight and message",
+        "zh": "洞察与展台要说的话"
+      },
+      "purpose": "The insight and what the booth says.",
+      "roles": [
+        "divider",
+        "text"
+      ],
+      "required": "never"
+    },
+    {
+      "id": "overview",
+      "title": {
+        "en": "Overview",
+        "zh": "方案总览"
+      },
+      "purpose": "All selected concepts at a glance.",
+      "roles": [
+        "overview"
+      ],
+      "required": "never"
+    },
+    {
+      "id": "concepts",
+      "title": {
+        "en": "The concepts",
+        "zh": "方案"
+      },
+      "purpose": "Board, detail and plan per selected concept.",
+      "roles": [
+        "divider",
+        "board",
+        "plan",
+        "text",
+        "annotated"
+      ],
+      "required": "never"
+    },
+    {
+      "id": "compare",
+      "title": {
+        "en": "Compare",
+        "zh": "方案比选"
+      },
+      "purpose": "Why choose each concept and the next step.",
+      "roles": [
+        "compare"
+      ],
+      "required": "never"
+    },
+    {
+      "id": "lead",
+      "title": {
+        "en": "The lead developed",
+        "zh": "主推方案深化"
+      },
+      "purpose": "Annotated, materials, interaction or text pages of the lead.",
+      "roles": [
+        "divider",
+        "annotated",
+        "materials",
+        "interaction",
+        "text",
+        "plan"
+      ],
+      "required": "never"
+    },
+    {
+      "id": "appendix",
+      "title": {
+        "en": "Appendix",
+        "zh": "附录"
+      },
+      "purpose": "Response table by design point and the sign-off list.",
+      "roles": [
+        "response",
+        "signoff",
+        "text"
+      ],
+      "required": "never",
+      "part": "appendix"
+    }
+  ]
+}

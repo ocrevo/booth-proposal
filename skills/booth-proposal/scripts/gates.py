@@ -1,6 +1,7 @@
 """Gates for the early steps of a booth proposal project.
 
-Commands: brief [--stamp], frame, ideas [--scaffold], select, renders, concepts, report brief|ideas|renders|concepts.
+Commands: brief [--stamp], frame, ideas [--scaffold], select, renders, concepts, architectures [--json],
+report brief|ideas|renders|concepts.
 Every command takes --project (default "."), written after the command name.
 Exit codes: 0 done, 1 at least one error finding, 2 bad invocation or unusable input.
 Messages are English and start with the rule name ("stale: ..."); only `report` prints text in
@@ -18,10 +19,11 @@ import os
 import re
 import sys
 
-from common import (Finding, InputError, _CONCEPT_ID_RE, _LEGACY_SET, _SET_ID_RE, _images_in, concept_ref,
-                    list_concepts, load_labels, now_iso, print_findings, read_front_matter, read_json, read_review,
-                    read_sidecar, real, review_is_current_pass, scan_reference_sets, sha256_file, sidecar_version,
-                    to_m, trace_base_chain, write_json, find_project)
+from common import (CLAUSE_KINDS, CLAUSE_N_RE, DEFAULTS, Finding, InputError, _CONCEPT_ID_RE, _LEGACY_SET,
+                    _SET_ID_RE, _images_in, architecture_choice, concept_ref, find_project, inside, list_concepts,
+                    load_architectures, load_labels, now_iso, print_findings, read_front_matter, read_json,
+                    read_review, read_sidecar, real, required_chapters, review_is_current_pass, scan_reference_sets,
+                    sha256_file, sidecar_version, to_m, trace_base_chain, write_json)
 
 _BRIEF = "brief/brief.json"
 _IDEAS = "brief/ideas.json"
@@ -90,6 +92,116 @@ def _reference_findings(project, disk_sets: list[dict], scan: list[Finding]) -> 
 
 
 # ---------- brief ----------
+
+def _ids_of(brief: dict, key: str) -> set:
+    v = brief.get(key)
+    return {i["id"] for i in v if isinstance(i, dict) and isinstance(i.get("id"), str)} if isinstance(v, list) \
+        else set()
+
+
+def _proposal_problems(project, add, out) -> None:
+    """proposal.architecture of brief.json and thresholds.architecture of deck-style.json (rule: field, architecture)."""
+    reg = load_architectures()
+
+    def unknown(v):
+        return f"unknown architecture '{v}'; known: {', '.join(sorted(reg))}; run gates.py architectures"
+
+    proposal = project.brief.get("proposal")
+    if proposal is not None:
+        if not isinstance(proposal, dict):
+            add("proposal", "field", "proposal must be an object")
+        elif "architecture" in proposal:
+            v = proposal["architecture"]
+            if not _nonempty_str(v):
+                add("proposal.architecture", "field", "architecture must be a non-empty string")
+            elif v.strip() not in reg:
+                add("proposal.architecture", "architecture", unknown(v.strip()))
+    th = project.style.get("thresholds")
+    if isinstance(th, dict) and isinstance(th.get("architecture"), str) and th["architecture"] not in reg:
+        out.append(Finding("G-BRIEF", "error", "brief/deck-style.json thresholds.architecture",
+                           "architecture: " + unknown(th["architecture"])))
+
+
+def _clause_problems(project, add) -> None:
+    """clauses[] of brief.json (rule: field, clause-n, clause-kind, points, source)."""
+    b = project.brief
+    value = b.get("clauses")
+    if value is None:
+        return
+    if not isinstance(value, list):
+        add("clauses", "field", "clauses must be a list")
+        return
+    points = _ids_of(b, "design_points")
+    seen: set = set()
+    for i, item in enumerate(value):
+        p = f"clauses[{i}]"
+        if not isinstance(item, dict):
+            add(p, "field", "expected an object")
+            continue
+        n = item.get("n")
+        if not isinstance(n, str):
+            add(f"{p}.n", "field", 'n must be a string such as "2" or "8.1"')
+        elif not CLAUSE_N_RE.fullmatch(n):
+            add(f"{p}.n", "clause-n", f"'{n}' is not a clause number such as 2, 8.1 or 3a")
+        elif n in seen:
+            add(f"{p}.n", "clause-n", f"duplicate clause number '{n}'")
+        else:
+            seen.add(n)
+        if not _nonempty_str(item.get("text")):
+            add(f"{p}.text", "field", "text must be a non-empty string")
+        if "source" in item and not isinstance(item["source"], str):
+            add(f"{p}.source", "field", "source must be a string")
+        elif not _nonempty_str(item.get("source")):
+            add(f"{p}.source", "source", "source is missing or blank")
+        if item.get("kind") not in CLAUSE_KINDS:
+            add(f"{p}.kind", "clause-kind", "kind must be one of " + ", ".join(CLAUSE_KINDS))
+        pts = item.get("points", [])
+        if not (isinstance(pts, list) and all(isinstance(x, str) for x in pts)):
+            add(f"{p}.points", "field", "points must be a list of design point ids")
+        else:
+            for j, x in enumerate(pts):
+                if x not in points:
+                    add(f"{p}.points[{j}]", "points", f"'{x}' is not a design point id")
+
+
+def _graphic_ref_ok(project, ref: str) -> bool:
+    if "\\" in ref or ref.startswith("/") or re.match(r"[A-Za-z]:", ref):
+        return False
+    parts = ref.split("/")
+    if len(parts) < 2 or parts[0] != "input" or any(x in ("", ".", "..") for x in parts):
+        return False
+    full = project.path(*parts)
+    return os.path.isfile(full) and inside(project.path("input"), full)
+
+
+def _graphic_problems(project, add) -> None:
+    """graphics[] beyond the shared item rules (rule: ratio, graphic-ref, content, field)."""
+    value = project.brief.get("graphics")
+    if not isinstance(value, list):
+        return
+    claims = _ids_of(project.brief, "claims")
+    for i, item in enumerate(value):
+        p = f"graphics[{i}]"
+        if not isinstance(item, dict):
+            continue
+        ratio = item.get("ratio")
+        if isinstance(ratio, str) and ratio.strip() and not re.fullmatch(r"\d+(\.\d+)?:\d+(\.\d+)?", ratio):
+            add(f"{p}.ratio", "ratio", "ratio must look like 2:3 or 16:9")
+        refs = item.get("refs", [])
+        if not (isinstance(refs, list) and all(isinstance(x, str) for x in refs)):
+            add(f"{p}.refs", "field", "refs must be a list of paths")
+        else:
+            for j, ref in enumerate(refs):
+                if not _graphic_ref_ok(project, ref):
+                    add(f"{p}.refs[{j}]", "graphic-ref", f"'{ref}' must name an existing file inside input/")
+        content = item.get("content", [])
+        if not (isinstance(content, list) and all(isinstance(x, str) for x in content)):
+            add(f"{p}.content", "field", "content must be a list of claim ids")
+        else:
+            for j, x in enumerate(content):
+                if x not in claims:
+                    add(f"{p}.content[{j}]", "content", f"'{x}' is not a claim id")
+
 
 def _brief_problems(project) -> list[Finding]:
     """G-BRIEF errors for brief.json content (rules: field, id, source, dnm, labels)."""
@@ -162,6 +274,10 @@ def _brief_problems(project) -> list[Finding]:
     items("design_points", r"D\d+", ("id", "type", "text"), True)
     items("claims", r"C\d+", ("id", "text"), True)
     items("assumptions", r"A\d+", ("id", "text"), False, optional=True)
+    items("graphics", r"GR\d+", ("id", "title", "purpose", "ratio"), False, optional=True)
+    _proposal_problems(project, add, out)
+    _clause_problems(project, add)
+    _graphic_problems(project, add)
 
     if _nonempty_str(lang) and not project.labels:
         out.append(Finding("G-BRIEF", "error", f"assets/labels/{lang}.json",
@@ -719,6 +835,59 @@ def cmd_report(project, args) -> int:
     return 0
 
 
+# ---------- architectures ----------
+
+def _chapter_note(ch: dict) -> str:
+    if ch["required"] == "never":
+        return f"{ch['id']} (optional)"
+    if ch["required"] == "if-clause-kind":
+        return f"{ch['id']} (if clause kind {'/'.join(ch['kinds'])})"
+    if ch["required"] == "if-graphics":
+        return f"{ch['id']} (if graphics)"
+    return ch["id"]
+
+
+_SOURCE_WORDS = {"brief": "brief.json proposal.architecture", "deck-style": "deck-style thresholds.architecture",
+                 "default": "default"}
+
+
+def cmd_architectures(project, args) -> int:
+    reg = load_architectures()
+    default = project.thresholds["architecture"] if project else DEFAULTS["architecture"]
+    current, source, problem = None, None, None
+    if project is not None:
+        try:
+            current, source = architecture_choice(project)
+        except InputError as e:
+            problem = str(e)
+    order = ([default] if default in reg else []) + [k for k in sorted(reg) if k != default]
+    known = current in reg
+    required = required_chapters(reg[current], project.brief) if project is not None and known else None
+    if args.json:
+        print(json.dumps({"default": default, "current": current if known else None,
+                          "source": source if known else None, "required": required,
+                          "architectures": [reg[k] for k in order]}, ensure_ascii=False, indent=2))
+        return 0 if problem is None and (current is None or known) else 1
+    for k in order:
+        a = reg[k]
+        marks = [m for m, on in (("default", k == default), ("current", k == current)) if on]
+        label = a["label"].get(project.lang if project else "") or a["label"]["en"]
+        print(f"{k:<12}{label}" + (f"  [{', '.join(marks)}]" if marks else ""))
+        print(f"  {a['summary']['en']}")
+        print(f"  response: {a['response']}; images: {', '.join(a['allowed_kinds'])}; "
+              f"separate: {', '.join(a['separate_submission']) or '-'}")
+        print(f"  chapters: {', '.join(_chapter_note(c) for c in a['chapters'])}")
+    if problem is not None:
+        print(f"current: not usable ({problem}); run gates.py brief")
+        return 1
+    if project is not None and not known:
+        print(f"current: {current} is unknown; known: {', '.join(sorted(reg))}")
+        return 1
+    if project is not None:
+        print(f"current: {current} (from {_SOURCE_WORDS[source]}); required chapters now: {', '.join(required) or '-'}")
+    return 0
+
+
 # ---------- entry point ----------
 
 def _build_parser():
@@ -752,6 +921,9 @@ def _build_parser():
     p = sub.add_parser("concepts", parents=[common], help="check geometry and plan of the selected concepts")
     p.add_argument("--json", action="store_true")
 
+    p = sub.add_parser("architectures", parents=[common], help="list the proposal architectures")
+    p.add_argument("--json", action="store_true")
+
     p = sub.add_parser("report", parents=[common], help="Markdown summary for the user")
     p.add_argument("what", choices=["brief", "ideas", "renders", "concepts"])
     p.add_argument("--out", metavar="FILE", help="write the Markdown to this file")
@@ -778,6 +950,12 @@ def main(argv=None) -> int:
         if len(args.keys) > 26:
             sel.error("at most 26 keys")
     try:
+        if args.cmd == "architectures":
+            try:
+                project = find_project(args.project)
+            except InputError:
+                project = None
+            return cmd_architectures(project, args)
         project = find_project(args.project, check_selection=not (args.cmd == "select" and args.clear))
         return globals()[f"cmd_{args.cmd}"](project, args)
     except InputError as e:

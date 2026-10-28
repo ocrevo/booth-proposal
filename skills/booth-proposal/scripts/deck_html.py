@@ -700,8 +700,11 @@ def _repeat_units(node):
     return group, [n for n in node.iter() if n.get("data-repeat") == group]
 
 
-def catalogue_lines(tpl, budget_factor, lang="") -> list:
-    lines = [f"budget_factor {budget_factor:g} (lang {lang})"]
+def catalogue_lines(tpl, budget_factor, lang="", arch=None) -> list:
+    """One header line and one line per example. With an architecture the header names it and every example
+    line lists the chapters whose roles it can serve (nothing is filtered: every layout stays usable)."""
+    head = f"budget_factor {budget_factor:g} (lang {lang})"
+    lines = [head + (f" architecture {arch['id']}" if arch else "")]
     for ex in tpl.examples:
         group, units = _repeat_units(ex.node)
         skip = {id(d) for u in units[1:] for d in [u] + list(u.iter())}
@@ -715,8 +718,12 @@ def catalogue_lines(tpl, budget_factor, lang="") -> list:
                                    if i.tag == "img" and i.get("data-img")))
         name = ex.layout + (":" + ex.variant if ex.variant else "")
         rep = f"{group}x{len(units)}" if group else "-"
-        lines.append(f"{name}  roles={','.join(ex.roles)}  repeat={rep}  images={','.join(kinds) or '-'}  "
-                     f"slots={','.join(slots) or '-'}")
+        line = (f"{name}  roles={','.join(ex.roles)}  repeat={rep}  images={','.join(kinds) or '-'}  "
+                f"slots={','.join(slots) or '-'}")
+        if arch:
+            ids = [c["id"] for c in arch["chapters"] if set(c["roles"]) & set(ex.roles)]
+            line += f"  chapters={','.join(ids) or '-'}"
+        lines.append(line)
     return lines
 
 
@@ -802,16 +809,25 @@ def _report(e) -> int:
     return 2
 
 
-def cmd_layouts(project, emit_spec, count) -> int:
+def cmd_layouts(project, emit_spec, count, chapter=None) -> int:
     try:
+        arch = common.architecture_for(project)
         tpl = load_template(DEFAULT_TEMPLATE)
         if emit_spec is None:
-            print("\n".join(catalogue_lines(tpl, project.labels.get("budget_factor", 1), project.lang)))
+            print("\n".join(catalogue_lines(tpl, project.labels.get("budget_factor", 1), project.lang, arch)))
             return 0
         ex = find_example(tpl, emit_spec)
         if ex is None:
             raise DeckError(f"unknown layout '{emit_spec}'; run deck.py layouts")
-        sys.stdout.write(emit(ex, project, count))
+        out = emit(ex, project, count)
+        if chapter is not None:
+            ids = [c["id"] for c in arch["chapters"]]
+            if chapter not in ids:
+                raise DeckError(f"unknown chapter '{chapter}' for architecture {arch['id']} ({', '.join(ids)})")
+            sec = element(out)
+            sec.set("data-chapter", chapter)
+            out = sec.html() + "\n"
+        sys.stdout.write(out)
         return 0
     except DeckError as e:
         return _report(e)
@@ -831,6 +847,24 @@ def _backup(project) -> str:
     return dest
 
 
+def _skeleton(ex, chapter, project, number) -> str:
+    """The first slide of a chapter: the example emitted, marked with the chapter id (data-id, data-chapter,
+    data-part) and, past the cover, titled and numbered."""
+    sec = element(emit(ex, project))
+    sec.set("data-id", chapter["id"])
+    sec.set("data-chapter", chapter["id"])
+    if chapter.get("part"):
+        sec.set("data-part", chapter["part"])
+    title = (chapter.get("title") or {}).get(project.lang)
+    slot = next((x for x in leaf_slots(sec) if x.get("data-slot") == "title"), None)
+    if title and slot is not None and number:          # the cover keeps its TODO title
+        slot.set_text(title)
+    for n in sec.iter():                               # divider number: 01, 02, ...
+        if n.has_class("dno") and re.fullmatch(r"\s*\d{1,2}\s*", n.text()):
+            n.set_text(f"{number:02d}")
+    return sec.html() + "\n"
+
+
 def cmd_new(project, template, force) -> int:
     try:
         path = template or DEFAULT_TEMPLATE
@@ -843,7 +877,22 @@ def cmd_new(project, template, force) -> int:
         cover = next((e for e in tpl.examples if "cover" in e.roles), None)
         if cover is None:
             raise DeckError("the template has no cover example")
-        doc = parse(tpl.prefix + emit(cover, project) + "\n\n" + tpl.suffix)
+        arch = common.architecture_for(project)          # InputError propagates (deck.py exits 2)
+        required = common.required_chapters(arch, project.brief)
+        chapters = arch["chapters"]
+        pages = [_skeleton(cover, chapters[0], project, 0)]
+        written, number = [chapters[0]["id"]], 0
+        for ch in chapters[1:]:
+            if ch["id"] not in required or not ch["skeleton"]:
+                continue
+            ex = find_example(tpl, ch["skeleton"])
+            if ex is None:
+                raise DeckError(f"architecture {arch['id']}: chapter {ch['id']} names unknown layout "
+                                f"'{ch['skeleton']}'")
+            number += 1
+            pages.append(_skeleton(ex, ch, project, number))
+            written.append(ch["id"])
+        doc = parse(tpl.prefix + "\n".join(pages) + "\n\n" + tpl.suffix)
         h = doc.find(lambda n: n.tag == "html")
         if h is not None:
             h.set("lang", project.lang)
@@ -868,8 +917,12 @@ def cmd_new(project, template, force) -> int:
         if exists:
             print(f"backup: {project.rel(_backup(project))}")
         write_deck(project, text)
-        print(f"wrote pack/proposal.html: shell with 1 cover slide (lang {project.lang})")
-        print("next: deck.py layouts, then paste --emit fragments")
+        print(f"wrote pack/proposal.html: {len(written)} slide(s), architecture {arch['id']} (lang {project.lang})")
+        print(f"chapters: {', '.join(written)}")
+        optional = [c["id"] for c in chapters if c["id"] not in written]
+        if optional:
+            print(f"optional: {', '.join(optional)}")
+        print("next: deck.py layouts, then paste --emit fragments; --emit LAYOUT --chapter ID opens a chapter")
         return 0
     except DeckError as e:
         return _report(e)

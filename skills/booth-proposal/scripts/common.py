@@ -21,7 +21,14 @@ DEFAULTS = {  # contract 4.2, the only place a threshold number lives
     "prompt_words_warn": 350, "size_tolerance": 0.20, "person_height_m": 1.75, "fix_max": 3,
     "candidates_per_concept": 2, "seconds_per_image": 100, "walkway_m": 0.9, "headroom_m": 2.1,
     "span_m": 1.5, "geometry_tol": 0.005, "claim_min_digits": 2, "tiles_grid": "3x2",
+    "architecture": "tender",   # the only architecture id in code; brief proposal.architecture and deck-style override it
 }
+ARCHITECTURES_DIR = os.path.join(SKILL_DIR, "assets", "architectures")   # tests monkeypatch this
+CLAUSE_KINDS = ("design", "interaction", "graphics", "material", "hospitality", "execution", "price", "other")
+IMAGE_KINDS = ("render", "plan", "logo", "site", "graphic")   # "graphic": classified from stage A2 on
+CLAUSE_N_RE = re.compile(r"\d{1,3}(?:\.\d{1,3}){0,3}[a-z]?")   # 2, 8.1, 4.2.1, 3a (use fullmatch)
+_ARCH_ID_RE = re.compile(r"[a-z][a-z0-9-]{0,31}")
+_REQUIRED = ("always", "never", "if-clause-kind", "if-graphics")
 LEGIBLE_RATIO = 3.0  # least contrast ratio of text against its background (large-text level)
 PROJECT_FOLDERS = ("input", "refs", "brief", "concepts", "pack", "work", "renders", "prompts")  # project layout
 PLAIN_WORD_FOLDERS = ("input", "pack", "work")  # also ordinary words: text such as work/life is not a project path
@@ -159,6 +166,7 @@ class Project:
     style: dict
     thresholds: dict
     selection: dict | None = None
+    architecture: dict | None = None
 
     def path(self, *parts: str) -> str:
         return os.path.join(self.root, *parts)
@@ -189,9 +197,11 @@ def load_labels(lang: str) -> dict:
     return read_json(p)
 
 
-def thresholds(style: dict) -> dict:
-    """DEFAULTS updated from style["thresholds"]; unknown keys ignored, a wrong type is C-INPUT."""
+def thresholds(style: dict, base: dict | None = None) -> dict:
+    """DEFAULTS, then base (an architecture's thresholds, already validated), then style["thresholds"];
+    unknown keys ignored, a wrong type is C-INPUT."""
     out = dict(DEFAULTS)
+    out.update(base or {})
     given = style.get("thresholds", {})
     if not isinstance(given, dict):
         raise InputError("C-INPUT", "brief/deck-style.json thresholds", "expected object")
@@ -230,7 +240,8 @@ def _check_selection(sel: dict) -> None:
 def find_project(arg: str | None, *, check_selection: bool = True) -> Project:
     """Load a project folder. brief.json content is not checked here (that is gates.py brief).
     check_selection=False ignores brief/selection.json (selection is None), so `gates.py select --clear` can
-    remove a malformed file."""
+    remove a malformed file. An unknown or malformed architecture choice never raises here: project.architecture
+    stays None (gates.py brief reports it, architecture_for raises it)."""
     root = os.path.abspath(arg or ".")
     if not os.path.isdir(os.path.join(root, "brief")):
         raise InputError("C-INPUT", root, "no brief/ folder; pass --project <project folder>")
@@ -245,8 +256,204 @@ def find_project(arg: str | None, *, check_selection: bool = True) -> Project:
         selection = read_json_opt(os.path.join(root, "brief", "selection.json"))
         if selection is not None:
             _check_selection(selection)
-    return Project(root=root, brief=brief, lang=lang, labels=labels, style=style, thresholds=th,
-                   selection=selection)
+    project = Project(root=root, brief=brief, lang=lang, labels=labels, style=style, thresholds=th,
+                      selection=selection)
+    registry = load_architectures()            # a broken shipped file raises (exit 2 everywhere)
+    try:
+        aid = architecture_choice(project)[0]
+    except InputError:
+        aid = None
+    arch = registry.get(aid)
+    if arch is not None:
+        project.thresholds = thresholds(style, base=arch["thresholds"])
+        project.architecture = arch
+    return project
+
+
+# ---------- architectures (assets/architectures/<id>.json) ----------
+
+def _arch_fail(file: str, path: str, message: str):
+    raise InputError("C-INPUT", f"assets/architectures/{file} {path}".rstrip(), message)
+
+
+def _arch_lang_map(file: str, path: str, v) -> None:
+    if not isinstance(v, dict) or not isinstance(v.get("en"), str) or not v["en"].strip():
+        _arch_fail(file, path, 'expected an object of non-empty strings with an "en" key')
+    for k, x in v.items():
+        if not isinstance(k, str) or not isinstance(x, str) or not x.strip():
+            _arch_fail(file, f"{path}.{k}", "expected a non-empty string")
+
+
+def _arch_str_list(file: str, path: str, v, allowed, *, non_empty: bool) -> None:
+    if not isinstance(v, list) or (non_empty and not v) or not all(isinstance(x, str) for x in v):
+        _arch_fail(file, path, "expected a " + ("non-empty " if non_empty else "") + "list of strings")
+    if len(set(v)) != len(v):
+        _arch_fail(file, path, "expected unique values")
+    for i, x in enumerate(v):
+        if x not in allowed:
+            _arch_fail(file, f"{path}[{i}]", f"'{x}' is not one of {', '.join(allowed)}")
+
+
+def _threshold_kind_error(key: str, value) -> str | None:
+    """The expected-kind word when value has the wrong type for DEFAULTS[key], else None."""
+    default = DEFAULTS[key]
+    if isinstance(default, str):
+        return None if isinstance(value, str) else "str"
+    if isinstance(default, float):
+        return None if isinstance(value, (int, float)) and not isinstance(value, bool) else "number"
+    return None if isinstance(value, int) and not isinstance(value, bool) else "int"
+
+
+def _normalise_architecture(file: str, stem: str, data: dict) -> dict:
+    if data.get("schema") != "architecture/1":
+        _arch_fail(file, "schema", 'expected "schema": "architecture/1"')
+    aid = data.get("id")
+    if not isinstance(aid, str) or not _ARCH_ID_RE.fullmatch(aid) or aid != stem:
+        _arch_fail(file, "id", "expected an id matching [a-z][a-z0-9-]* equal to the file name")
+    _arch_lang_map(file, "label", data.get("label"))
+    _arch_lang_map(file, "summary", data.get("summary"))
+    if data.get("response") not in ("clauses", "design_points"):
+        _arch_fail(file, "response", 'expected "clauses" or "design_points"')
+    _arch_str_list(file, "allowed_kinds", data.get("allowed_kinds"), IMAGE_KINDS, non_empty=True)
+    _arch_str_list(file, "separate_submission", data.get("separate_submission"), CLAUSE_KINDS, non_empty=False)
+    th = data.get("thresholds", {})
+    if not isinstance(th, dict):
+        _arch_fail(file, "thresholds", "expected an object")
+    for key, value in th.items():
+        if key == "architecture" or key not in DEFAULTS:
+            _arch_fail(file, f"thresholds.{key}", "not a threshold key")
+        kind = _threshold_kind_error(key, value)
+        if kind:
+            _arch_fail(file, f"thresholds.{key}", f"expected {kind}")
+    chapters = data.get("chapters")
+    if not isinstance(chapters, list) or not chapters:
+        _arch_fail(file, "chapters", "expected a non-empty list")
+    out_ch, seen, separates = [], set(), 0
+    for i, ch in enumerate(chapters):
+        p = f"chapters[{i}]"
+        if not isinstance(ch, dict):
+            _arch_fail(file, p, "expected an object")
+        cid = ch.get("id")
+        if not isinstance(cid, str) or not _ARCH_ID_RE.fullmatch(cid):
+            _arch_fail(file, f"{p}.id", "expected an id such as 'design'")
+        if cid in seen:
+            _arch_fail(file, f"{p}.id", f"duplicate chapter id '{cid}'")
+        seen.add(cid)
+        _arch_lang_map(file, f"{p}.title", ch.get("title"))
+        if not isinstance(ch.get("purpose"), str) or not ch["purpose"].strip():
+            _arch_fail(file, f"{p}.purpose", "expected a non-empty string")
+        _arch_str_list(file, f"{p}.roles", ch.get("roles"), ROLES, non_empty=True)
+        req = ch.get("required")
+        if req not in _REQUIRED:
+            _arch_fail(file, f"{p}.required", "expected one of " + ", ".join(_REQUIRED))
+        if req == "if-clause-kind":
+            _arch_str_list(file, f"{p}.kinds", ch.get("kinds"), CLAUSE_KINDS, non_empty=True)
+        elif ch.get("kinds"):
+            _arch_fail(file, f"{p}.kinds", 'only a chapter with required "if-clause-kind" has kinds')
+        skeleton = ch.get("skeleton")
+        if skeleton is not None and (not isinstance(skeleton, str) or not skeleton.strip()):
+            _arch_fail(file, f"{p}.skeleton", "expected LAYOUT[:VARIANT] or null")
+        part = ch.get("part")
+        if part not in (None, "appendix"):
+            _arch_fail(file, f"{p}.part", 'expected "appendix" or null')
+        sep = ch.get("separate", False)
+        if not isinstance(sep, bool):
+            _arch_fail(file, f"{p}.separate", "expected true or false")
+        separates += 1 if sep else 0
+        out_ch.append({"id": cid, "title": ch["title"], "purpose": ch["purpose"], "roles": list(ch["roles"]),
+                       "required": req, "kinds": list(ch["kinds"]) if req == "if-clause-kind" else [],
+                       "skeleton": skeleton, "part": part, "separate": sep})
+    if "cover" not in out_ch[0]["roles"]:
+        _arch_fail(file, "chapters[0].roles", 'the first chapter must have the role "cover"')
+    if separates > 1:
+        _arch_fail(file, "chapters", "at most one chapter has separate true")
+    if data["separate_submission"] and separates != 1:
+        _arch_fail(file, "chapters", "separate_submission needs exactly one chapter with separate true")
+    return {"schema": "architecture/1", "id": aid, "label": data["label"], "summary": data["summary"],
+            "response": data["response"], "allowed_kinds": list(data["allowed_kinds"]),
+            "separate_submission": list(data["separate_submission"]), "thresholds": dict(th),
+            "chapters": out_ch}
+
+
+def load_architectures(folder: str | None = None) -> dict[str, dict]:
+    """{id: architecture} of every *.json in folder (default: the module global ARCHITECTURES_DIR read at call
+    time), sorted by id and validated; any problem is InputError C-INPUT. No cache."""
+    folder = folder or ARCHITECTURES_DIR
+    try:
+        names = sorted(n for n in os.listdir(folder) if n.lower().endswith(".json"))
+    except OSError as e:
+        raise InputError("C-INPUT", "assets/architectures", f"cannot read folder: {e.strerror or e}") from None
+    out = {}
+    for name in names:
+        data = read_json(os.path.join(folder, name))
+        arch = _normalise_architecture(name, os.path.splitext(name)[0], data)
+        out[arch["id"]] = arch
+    return out
+
+
+def architecture_choice(project) -> tuple[str, str]:
+    """(id, source); source "brief" | "deck-style" | "default". A present but non-string or blank brief
+    proposal.architecture, or a non-object proposal, is InputError C-INPUT."""
+    proposal = project.brief.get("proposal")
+    if proposal is not None:
+        bad = InputError("C-INPUT", "brief/brief.json proposal.architecture", "expected a non-empty string")
+        if not isinstance(proposal, dict):
+            raise bad
+        if "architecture" in proposal:
+            v = proposal["architecture"]
+            if not isinstance(v, str) or not v.strip():
+                raise bad
+            return v.strip(), "brief"
+    th = project.style.get("thresholds")
+    if isinstance(th, dict) and "architecture" in th:
+        return project.thresholds["architecture"], "deck-style"
+    return DEFAULTS["architecture"], "default"
+
+
+_ARCH_WHERE = {"brief": "brief/brief.json proposal.architecture",
+               "deck-style": "brief/deck-style.json thresholds.architecture",
+               "default": "common.DEFAULTS architecture"}
+
+
+def architecture_for(project) -> dict:
+    """The project's architecture; an unknown id is InputError C-INPUT at the place the id came from."""
+    aid, source = architecture_choice(project)
+    reg = load_architectures()
+    if aid not in reg:
+        raise InputError("C-INPUT", _ARCH_WHERE[source],
+                         f"unknown architecture '{aid}'; known: {', '.join(sorted(reg))}")
+    return reg[aid]
+
+
+def clauses_of(brief: dict) -> list[dict]:
+    """The clause dicts of brief.json whose n is a string (others are left to gates.py brief)."""
+    v = brief.get("clauses")
+    return [c for c in v if isinstance(c, dict) and isinstance(c.get("n"), str)] if isinstance(v, list) else []
+
+
+def graphics_of(brief: dict) -> list[dict]:
+    """The dict entries of brief.json graphics (empty when missing or not a list)."""
+    v = brief.get("graphics")
+    return [g for g in v if isinstance(g, dict)] if isinstance(v, list) else []
+
+
+def required_chapters(arch: dict, brief: dict) -> list[str]:
+    """Chapter ids required for this brief, in order: always; if-clause-kind when a clause kind is in the
+    chapter kinds; if-graphics when brief.json lists graphics."""
+    kinds = {c.get("kind") for c in clauses_of(brief)}
+    has_graphics = bool(graphics_of(brief))
+    out = []
+    for ch in arch["chapters"]:
+        req = ch["required"]
+        if req == "always" or (req == "if-clause-kind" and kinds & set(ch["kinds"])) \
+                or (req == "if-graphics" and has_graphics):
+            out.append(ch["id"])
+    return out
+
+
+def separate_chapter(arch: dict) -> dict | None:
+    """The chapter with separate true, or None."""
+    return next((c for c in arch["chapters"] if c["separate"]), None)
 
 
 # ---------- units, CJK, terms, colour ----------

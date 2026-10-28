@@ -26,6 +26,8 @@
                     Template images are data: placeholders; --emit empties src; deck paths are relative to pack/.
   - data-auto     : an element filled by --emit and new with the labels value at that dotted key
                     ({} = the nearest data-concept letter).
+  - data-chapter  : the chapter a slide opens (an id of the project's architecture); a slide without it
+                    continues the chapter before it. deck.py new writes it on the skeleton; --emit --chapter ID sets it.
   - Renders       : figure.render holding one img, stamped by CSS with --stamp.
     Plans, site   : figure.pic.contain holding one img (no stamp, letterboxed).
     Annotations   : figure.render.annotated holding one img and .pin callouts; data-x and data-y place a
@@ -583,6 +585,17 @@ html.checking .is-over{outline:3px solid var(--warn);outline-offset:2px}
     <p class="tag label acc" data-slot="label" data-max="12">TODO: label</p>
     <p class="say" data-slot="statement" data-max="48">TODO: one sentence</p>
     <p class="by" data-slot="by" data-max="50">TODO: one supporting line</p>
+  </div>
+</section>
+
+<!-- ===================================================================
+     STATEMENT · separate – the separate-submission page: the title and the fixed sentence come from the
+     labels (data-auto separate.title and separate.sentence); no slots, nothing to write, no figures
+     =================================================================== -->
+<section class="slide statement separate" data-id="statement-separate" data-roles="text">
+  <div class="body">
+    <p class="tag label acc" data-auto="separate.title"></p>
+    <p class="say" data-auto="separate.sentence"></p>
   </div>
 </section>
 

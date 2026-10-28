@@ -32,5 +32,6 @@
     "fail": "fail",
     "none": "(none)",
     "cost_line": "{concepts} concepts × {per} candidates = {images} images, about {minutes} min if run one after another"
-  }
+  },
+  "separate": {"title": "Submitted separately", "sentence": "The schedule, on-site staffing and pricing are submitted separately."}
 }

@@ -37,6 +37,7 @@ def test_dist_build(tmp_path):
         names = z.namelist()
     for need in ["SKILL.md", "scripts/common.py", "scripts/gates.py", "scripts/deck.py",
                  "assets/deck/template.html", "assets/labels/zh.json", "assets/prompts/lint.json",
+                 "assets/architectures/tender.json",
                  "references/review.md"]:
         assert f"booth-proposal/{need}" in names, need
     assert not any(n.startswith("booth-proposal/evals/") for n in names)

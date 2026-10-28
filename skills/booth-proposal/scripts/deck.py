@@ -1,8 +1,8 @@
 """Proposal deck CLI: pack/proposal.html is the single source; this script never writes pages except as listed.
 
-  new      shell with head, style#tokens, style#design, viewer and one empty cover (--template, --force)
+  new      shell with head, style#tokens, style#design, viewer and the skeleton pages of the architecture (--template, --force)
   style    rewrite only style#tokens from brief/deck-style.json and the labels (--template)
-  layouts  catalogue of the template; --emit LAYOUT[:VARIANT] [--count N] prints a fragment to paste
+  layouts  catalogue of the template; --emit LAYOUT[:VARIANT] [--count N] [--chapter ID] prints a fragment to paste
   check    read-only check of the deck (--json writes work/check.json)
   render   refresh page references, draft PDF, previews, contact sheet, overflow and upscale (work/)
   text     page text blocks (--diff: pages changed since the recorded review)
@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="cmd", required=True)
     base = argparse.ArgumentParser(add_help=False)
     base.add_argument("--project", default=".", help="the project folder (default: the current folder)")
-    p = sub.add_parser("new", parents=[base], help="write the pack/proposal.html shell with one cover")
+    p = sub.add_parser("new", parents=[base], help="write the pack/proposal.html shell with the architecture skeleton")
     p.add_argument("--template", help="template file (default: assets/deck/template.html of this skill)")
     p.add_argument("--force", action="store_true", help="replace an existing deck (the old one goes to work/backup/)")
     p = sub.add_parser("style", parents=[base], help="rewrite only the tokens block")
@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("layouts", parents=[base], help="catalogue of the template, or one fragment with --emit")
     p.add_argument("--emit", metavar="LAYOUT[:VARIANT]", help="print the HTML fragment of this example")
     p.add_argument("--count", type=int, help="repeat the repeat unit N times (needs --emit)")
+    p.add_argument("--chapter", metavar="ID", help="set data-chapter on the fragment (needs --emit)")
     p = sub.add_parser("check", parents=[base], help="check the deck; read-only")
     p.add_argument("--json", action="store_true",
                    help="print the findings as JSON instead of the text report, then write work/check.json")
@@ -63,6 +64,8 @@ def main(argv=None) -> int:
             ap.error("--count needs --emit")
         if args.count is not None and args.count < 1:
             ap.error("--count must be at least 1")
+        if args.chapter is not None and args.emit is None:
+            ap.error("--chapter needs --emit")
     try:
         project = common.find_project(args.project)
         if args.cmd == "new":
@@ -70,7 +73,7 @@ def main(argv=None) -> int:
         if args.cmd == "style":
             return deck_html.cmd_style(project, args.template)
         if args.cmd == "layouts":
-            return deck_html.cmd_layouts(project, args.emit, args.count)
+            return deck_html.cmd_layouts(project, args.emit, args.count, args.chapter)
         if args.cmd == "check":
             return deck_check.cmd_check(project, args.json)
         if args.cmd == "render":

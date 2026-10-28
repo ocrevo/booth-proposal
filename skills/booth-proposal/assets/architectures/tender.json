@@ -1,0 +1,145 @@
+{
+  "schema": "architecture/1",
+  "id": "tender",
+  "label": {
+    "en": "Tender response",
+    "zh": "招标回应型"
+  },
+  "summary": {
+    "en": "Follows a numbered tender: the brief recapped, the design answered clause by clause, optional chapters only when the brief asks for them, and a clause response table.",
+    "zh": "跟随有编号条款的招标：复述需求，逐条回应设计条款；只有 brief 要求时才出现可选章节；附条款回应表。"
+  },
+  "response": "clauses",
+  "allowed_kinds": [
+    "render",
+    "plan",
+    "logo",
+    "site",
+    "graphic"
+  ],
+  "separate_submission": [
+    "execution",
+    "price"
+  ],
+  "thresholds": {},
+  "chapters": [
+    {
+      "id": "cover",
+      "title": {
+        "en": "Cover",
+        "zh": "封面"
+      },
+      "purpose": "Proposal title, the lead render, client and event.",
+      "roles": [
+        "cover"
+      ],
+      "required": "always",
+      "skeleton": null
+    },
+    {
+      "id": "understanding",
+      "title": {
+        "en": "Understanding the brief",
+        "zh": "项目理解"
+      },
+      "purpose": "The project and the event recapped, the stand space (optionally pack/site.svg), the requirements in plain words.",
+      "roles": [
+        "divider",
+        "agenda",
+        "text",
+        "materials",
+        "plan"
+      ],
+      "required": "always",
+      "skeleton": "divider"
+    },
+    {
+      "id": "design",
+      "title": {
+        "en": "Design response",
+        "zh": "设计方案"
+      },
+      "purpose": "The concept or concepts, plans, annotated views and one page or group per design clause, in clause order.",
+      "roles": [
+        "divider",
+        "overview",
+        "board",
+        "plan",
+        "annotated",
+        "materials",
+        "compare",
+        "text",
+        "response"
+      ],
+      "required": "always",
+      "skeleton": "divider"
+    },
+    {
+      "id": "interaction",
+      "title": {
+        "en": "Interaction",
+        "zh": "互动方案"
+      },
+      "purpose": "Only when the brief has interaction clauses: what visitors do, the content, the route through it.",
+      "roles": [
+        "divider",
+        "interaction",
+        "annotated",
+        "text"
+      ],
+      "required": "if-clause-kind",
+      "kinds": [
+        "interaction"
+      ],
+      "skeleton": "divider"
+    },
+    {
+      "id": "graphics",
+      "title": {
+        "en": "Graphic design",
+        "zh": "平面设计"
+      },
+      "purpose": "Only when the brief lists graphics: one page per requested graphic (images arrive with render.py graphic).",
+      "roles": [
+        "divider",
+        "text"
+      ],
+      "required": "if-graphics",
+      "skeleton": "divider"
+    },
+    {
+      "id": "separate",
+      "title": {
+        "en": "Submitted separately",
+        "zh": "另行提交"
+      },
+      "purpose": "Only when the brief has execution or price clauses: one page with the fixed sentence; no figures.",
+      "roles": [
+        "text"
+      ],
+      "required": "if-clause-kind",
+      "kinds": [
+        "execution",
+        "price"
+      ],
+      "skeleton": "statement:separate",
+      "separate": true
+    },
+    {
+      "id": "appendix",
+      "title": {
+        "en": "Appendix",
+        "zh": "附录"
+      },
+      "purpose": "The clause response table (one row per clause with its pages) and the items to confirm.",
+      "roles": [
+        "response",
+        "signoff",
+        "text"
+      ],
+      "required": "always",
+      "skeleton": "table",
+      "part": "appendix"
+    }
+  ]
+}

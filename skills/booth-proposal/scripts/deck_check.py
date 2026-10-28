@@ -192,7 +192,7 @@ class ImageInfo(NamedTuple):
     path: str | None
     rel: str | None
     sha256: str | None
-    kind: str | None                       # "render" | "plan" | "logo" | "site" | None
+    kind: str | None                       # "render" | "plan" | "logo" | "site" | "graphic" | None
     concept: "common.ConceptRef | None"
     problems: list                         # (code, level, message), independent of where the image is placed
 
@@ -212,6 +212,8 @@ class Images:
         self._ref_hashes = None
         self._by_real = {}
         self._by_url = {}
+        self.arch = common.architecture_for(project)
+        self.allowed = set(self.arch["allowed_kinds"])
         lp = deck_html.logo_path(project)
         self._logo_real = common.real(lp) if lp else None
 
@@ -290,11 +292,14 @@ class Images:
         rel = project.rel(full)
         problems = []
 
-        def info(kind, concept=None):
-            return ImageInfo(shown, full, rel, sha, kind, concept, problems)
-
         def forbid(msg):
             problems.append(("D-IMG-FORBIDDEN", "error", msg))
+
+        def info(kind, concept=None):
+            if kind is not None and kind not in self.allowed:
+                forbid(f"kind: {rel} is a {kind} image; the {self.arch['id']} architecture allows "
+                       + ", ".join(self.arch["allowed_kinds"]))
+            return ImageInfo(shown, full, rel, sha, kind, concept, problems)
 
         if rp == self._logo_real or common.inside(project.path("brief", "brand"), full):
             if sha in self.reference_hashes:
@@ -425,7 +430,7 @@ class _Vocab:
             return [i for i in v if isinstance(i, dict)] if isinstance(v, list) else []
 
         ids = {}
-        for key in ("design_points", "claims", "assumptions"):
+        for key in ("design_points", "claims", "assumptions", "graphics"):
             for it in items(key):
                 if isinstance(it.get("id"), str) and it["id"]:
                     ids[it["id"]] = True
@@ -436,8 +441,9 @@ class _Vocab:
         client = brief.get("client") if isinstance(brief.get("client"), dict) else {}
         protect = [x for x in list(client.get("names") or []) + list(brief.get("protected_terms") or [])
                    if isinstance(x, str)]
-        protect += [it["text"] for k in ("design_points", "claims") for it in items(k)
+        protect += [it["text"] for k in ("design_points", "claims", "clauses") for it in items(k)
                     if isinstance(it.get("text"), str)]
+        protect += [it["title"] for it in items("graphics") if isinstance(it.get("title"), str)]
         self.ids = list(ids)
         self.protect = protect
         sets = {c.set for c in common.list_concepts(project)}
@@ -460,7 +466,7 @@ class _Vocab:
         booth = brief.get("booth")
         if isinstance(booth, dict):
             sources.append(booth.get("source"))
-        sources += [it.get("source") for k in ("design_points", "claims") for it in items(k)]
+        sources += [it.get("source") for k in ("design_points", "claims", "clauses") for it in items(k)]
         self.sources = sorted({s for s in sources if isinstance(s, str) and len(s) >= 4})
 
     def internal(self, text, headers=()):
@@ -611,6 +617,98 @@ def run_check(project, deck_text=None, render_json=True) -> CheckResult:
             letter = display.get(key)
             if letter and not any(s.get("data-role") == "board" and s.get("data-concept") == letter for s in slides):
                 add("D-STRUCT", "error", key, f"board: concept {letter} ({key}) has no board slide")
+
+    # chapters, the separate-submission page and the clause table (the architecture decides which rules fire)
+    arch = common.architecture_for(project)
+    order = [c["id"] for c in arch["chapters"]]
+    chapter_of, cur = [], None
+    for s in slides:
+        v = (s.get("data-chapter") or "").strip()
+        if v:
+            cur = v
+        chapter_of.append(cur)
+    enforced = any(c["required"] != "never" for c in arch["chapters"])
+    on = ", ".join(order)
+    highest = -1
+    for n, s in enumerate(slides, 1):
+        own = (s.get("data-chapter") or "").strip()
+        if own and own not in order:
+            slide_add("D-STRUCT", "error", n, f"chapter: data-chapter '{own}' is not a chapter of the "
+                                              f"{arch['id']} architecture ({on})")
+        elif own:
+            if order.index(own) < highest:
+                slide_add("D-STRUCT", "warn", n, f"chapter: chapter '{own}' comes after '{order[highest]}'; "
+                                                 f"the {arch['id']} order is {on}")
+            highest = max(highest, order.index(own))
+    if enforced and slides and chapter_of[0] is None:
+        slide_add("D-STRUCT", "error", 1, "chapter: the pages before the first data-chapter belong to no chapter; "
+                                          "put data-chapter on the first page of each chapter")
+    no_chapters = all(c is None for c in chapter_of)
+    for cid in common.required_chapters(arch, project.brief):
+        if cid not in chapter_of and not (enforced and no_chapters):    # one error above is enough
+            add("D-STRUCT", "error", "deck", f"chapter: required chapter '{cid}' has no page; "
+                                             f"start it with data-chapter=\"{cid}\"")
+    sep = common.separate_chapter(arch)
+    sep_nums = [n for n, c in enumerate(chapter_of, 1) if sep and c == sep["id"]]
+    if sep is not None and sep_nums:
+        lab = project.labels.get("separate") or {}
+
+        def flat(t):
+            return " ".join((t or "").split())
+
+        if len(sep_nums) > 1:
+            slide_add("D-STRUCT", "error", sep_nums[1], f"separate: the separate-submission chapter has "
+                      f"{len(sep_nums)} pages; it holds one page (start the next chapter with data-chapter)")
+        n0 = sep_nums[0]
+        text0 = flat(visible_text(slides[n0 - 1]))
+        sentence, title = flat(lab.get("sentence")), flat(lab.get("title"))
+        if sentence and sentence not in text0:
+            slide_add("D-STRUCT", "error", n0, "separate: the page must carry the fixed sentence of the labels "
+                                               "(separate.sentence)")
+        rest = text0
+        for fixed in sorted((x for x in (sentence, title) if x), key=len, reverse=True):
+            rest = rest.replace(fixed, " ")
+        if re.sub(r"[\W_]+", "", rest):
+            slide_add("D-STRUCT", "error", n0, f"separate: text other than the fixed labels on the "
+                                               f"separate-submission page: \"{rest.strip()[:40]}\"")
+        for n in sep_nums:
+            t = visible_text(slides[n - 1]).translate(FULLWIDTH)
+            for tok in dict.fromkeys(re.findall(r"\d+(?:[.,]\d+)*", t)):
+                slide_add("D-NUMBER", "error", n, f"separate: \"{tok}\" on the separate-submission page; schedule, "
+                                                  "staffing and price figures are submitted separately")
+    clauses = common.clauses_of(project.brief)
+    if arch["response"] == "clauses" and clauses:
+        known = {c["n"]: c for c in clauses}
+        sep_ids = {slides[n - 1].get("data-id") for n in sep_nums}
+        rowed = set()
+        for n, s in enumerate(slides, 1):
+            if s.get("data-role") != "response":
+                continue
+            for row in [s] + list(s.iter()):
+                v = row.get("data-clause")
+                if v is None:
+                    continue
+                v = v.strip()
+                if v not in known:
+                    slide_add("D-STRUCT", "error", n, f"clause: a row names clause '{v}', which brief.json "
+                                                      "does not list")
+                    continue
+                if v in rowed:
+                    slide_add("D-STRUCT", "error", n, f"clause: clause {v} has more than one row")
+                rowed.add(v)
+                targets = [(x.get("data-ref") or "").strip() for x in [row] + list(row.iter())
+                           if (x.get("data-ref") or "").strip()]
+                if not targets:
+                    slide_add("D-STRUCT", "error", n, f"clause: the row of clause {v} has no page reference "
+                                                      "(data-ref)")
+                elif known[v].get("kind") in arch["separate_submission"] \
+                        and any(t not in sep_ids for t in targets):
+                    slide_add("D-STRUCT", "error", n, f"clause: clause {v} ({known[v].get('kind')}) must point "
+                                                      "to the separate-submission page")
+        for c in clauses:
+            if c["n"] not in rowed:
+                add("D-STRUCT", "error", "deck", f"clause: clause {c['n']} has no row in the response table "
+                                                 "(a data-clause row on a response page)")
 
     # images: every URL once, placement, reuse
     images = Images(project)

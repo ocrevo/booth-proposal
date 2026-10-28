@@ -99,7 +99,7 @@ def test_layouts(make_project, capsys):
 
 
 def test_new_and_style(make_project, capsys):
-    root = make_project(renders=False, style={"logo": "brand/logo.png"})
+    root = make_project(renders=False, style={"logo": "brand/logo.png"}, arch="showcase")
     deck_file = root / "pack" / "proposal.html"
     capsys.readouterr()
     assert run(root, "new") == 0

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import copy
 import io
 import os
 import sys
@@ -44,7 +45,27 @@ def png_bytes(rgb, size=(64, 48)) -> bytes:
     return buf.getvalue()
 
 
-def brief_dict(lang="en") -> dict:
+CLAUSES = [
+    {"n": "2", "text": "Open, walk-in stand with a clear entrance", "source": "Tender p.3 item 2",
+     "kind": "design", "points": ["D1"]},
+    {"n": "5", "text": "An interactive area about the Tidewater Pass app", "source": "Tender p.3 item 5",
+     "kind": "interaction", "points": ["D2"]},
+    {"n": "7", "text": "Build schedule and on-site staff", "source": "Tender p.4 item 7", "kind": "execution",
+     "points": []},
+    {"n": "8.1", "text": "Overall price and itemised price", "source": "Tender p.4 item 8.1", "kind": "price",
+     "points": []},
+]
+
+
+def brief_dict(lang="en", arch=None) -> dict:
+    out = _brief_base(lang)
+    out["clauses"] = copy.deepcopy(CLAUSES)
+    if arch is not None:
+        out["proposal"] = {"architecture": arch}
+    return out
+
+
+def _brief_base(lang) -> dict:
     return {
         "schema": "brief/2",
         "lang": lang,
@@ -212,7 +233,7 @@ def add_render(root, key: str, name: str, *, mode: str = "hero", base: str | Non
 
 
 def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaffold=True,
-                  renders=True, chosen=True, style=None) -> Path:
+                  renders=True, chosen=True, style=None, arch=None) -> Path:
     root = Path(root)
     if root.exists() and any(root.iterdir()):
         raise ValueError(f"{root} is not empty")
@@ -222,7 +243,7 @@ def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaf
         raise ValueError("scaffold needs ideas=True")
     root.mkdir(parents=True, exist_ok=True)
 
-    common.write_json(str(root / "brief" / "brief.json"), brief_dict(lang))
+    common.write_json(str(root / "brief" / "brief.json"), brief_dict(lang, arch))
     if style is not None:
         common.write_json(str(root / "brief" / "deck-style.json"), style)
 
@@ -274,7 +295,7 @@ def build_project(root, *, lang="en", legacy=False, stamp=True, ideas=True, scaf
 DECK_SELECTED = ("set-2/B", "set-1/A")         # display letters A and B; lead set-1/A
 DECK_LEAD = "set-1/A"
 _FILLER = "Open timber lounge for visitors to rest and talk"
-_DECK_CACHE: dict[str, str] = {}               # lang -> a built project folder, copied for each test
+_DECK_CACHE: dict[tuple, str] = {}             # (lang, architecture) -> a built project folder, copied for each test
 
 
 def _geometry(title: str, arch: str, bar: str) -> dict:
@@ -336,11 +357,12 @@ def _emit(root, spec: str, count: int | None = None) -> str:
     return out.getvalue()
 
 
-def _build_deck_project(root: Path, lang: str) -> None:
+def _deck_base(root: Path, lang: str, arch: str):
+    """The project of the deck fixtures up to the new deck: build_project, reviewed chosen renders, selection,
+    geometry and plans, then deck.py new. Returns (render_of, plan_of)."""
     import deck
-    import deck_html as h
     import draw_plan
-    build_project(root, lang=lang, style={"logo": "brand/logo.png"})
+    build_project(root, lang=lang, style={"logo": "brand/logo.png"}, arch=arch)
     brief = common.read_json(str(root / "brief" / "brief.json"))
     brief["protected_terms"].append("Tidewater C1")
     common.write_json(str(root / "brief" / "brief.json"), brief)
@@ -364,26 +386,37 @@ def _build_deck_project(root: Path, lang: str) -> None:
 
     with contextlib.redirect_stdout(io.StringIO()):
         assert deck.main(["new", "--project", str(root)]) == 0
+    return render_of, plan_of
+
+
+def _body_pages(root: Path, render_of, plan_of) -> list:
+    """The six concept pages and the compare page shared by the showcase and the tender fixture."""
     a, b = DECK_SELECTED
-    text = (root / "pack" / "proposal.html").read_text(encoding="utf-8")
-    slides = h.slides_of(h.parse(text))
-    pages = [fill(slides[0].html(), {"title": "Tidewater Pass"}, [render_of(DECK_LEAD)], {"data-id": "cover"})]
-    pages.append(fill(_emit(root, "board"), None, [render_of(a)],
-                      {"data-id": "a-board", "data-concept": "A", "data-covers": "D1"}))
-    pages.append(fill(_emit(root, "plan"), None, [plan_of(a)], {"data-id": "a-plan", "data-concept": "A"}))
-    pages.append(fill(_emit(root, "board"), None, [render_of(b)], {"data-id": "b-board", "data-concept": "B"}))
-    pages.append(fill(_emit(root, "plan"), None, [plan_of(b)], {"data-id": "b-plan", "data-concept": "B"}))
-    pages.append(fill(_emit(root, "annotated"), None, [render_of(b)],
-                      {"data-id": "b-annotated", "data-concept": "B"}))
+    pages = [fill(_emit(root, "board"), None, [render_of(a)],
+                  {"data-id": "a-board", "data-concept": "A", "data-covers": "D1"}),
+             fill(_emit(root, "plan"), None, [plan_of(a)], {"data-id": "a-plan", "data-concept": "A"}),
+             fill(_emit(root, "board"), None, [render_of(b)], {"data-id": "b-board", "data-concept": "B"}),
+             fill(_emit(root, "plan"), None, [plan_of(b)], {"data-id": "b-plan", "data-concept": "B"}),
+             fill(_emit(root, "annotated"), None, [render_of(b)], {"data-id": "b-annotated", "data-concept": "B"})]
     compare = _emit(root, "compare", 2).replace(
         "</section>", '  <figure class="render" style="width:320px;height:200px"><img data-img="render" alt="" '
         'src=""></figure>\n</section>')
     pages.append(fill(compare, {"c1-why": 'Strong entrance <span data-ref="a-plan"></span>',
                                 "c2-why": 'Open lounge <span data-ref="D1"></span>'},
                       [render_of(DECK_LEAD)], {"data-id": "compare"}))
+    return pages
+
+
+def _claims_page(root: Path) -> str:
     claims = _emit(root, "table").replace('data-slot="r1-a"', 'data-slot="r1-a" data-claim="C1"')
-    pages.append(fill(claims, {"r1-a": "14 hybrid vessels in service", "title": "Claims to confirm"}, (),
-                      {"data-id": "claims", "data-role": "signoff", "data-part": "appendix"}))
+    return fill(claims, {"r1-a": "14 hybrid vessels in service", "title": "Claims to confirm"}, (),
+                {"data-id": "claims", "data-role": "signoff", "data-part": "appendix"})
+
+
+def _write_deck_pages(root: Path, pages: list) -> None:
+    import deck_html as h
+    text = (root / "pack" / "proposal.html").read_text(encoding="utf-8")
+    slides = h.slides_of(h.parse(text))
     body = "\n".join(p.rstrip("\n") + "\n" for p in pages)
     out = text[:slides[0].start] + body + "\n" + text[slides[-1].end:].lstrip("\n")
     project = common.find_project(str(root))
@@ -392,21 +425,55 @@ def _build_deck_project(root: Path, lang: str) -> None:
     h.write_deck(project, tree.html())
 
 
-def deck_project(tmp_path, lang: str = "en") -> Path:
-    """tmp_path/deck-project: build_project (with the logo in brief/brand), two selected concepts (set-2/B shown as
-    A, set-1/A shown as B and lead), reviewed chosen renders, geometry and plans, and a deck of eight slides:
-    cover, a-board, a-plan, b-board, b-plan, b-annotated, compare, claims (signoff, appendix). Built once per
-    language with the real commands and copied for each caller."""
+def _build_deck_project(root: Path, lang: str, arch: str = "showcase") -> None:
+    import deck_html as h
+    render_of, plan_of = _deck_base(root, lang, arch)
+    text = (root / "pack" / "proposal.html").read_text(encoding="utf-8")
+    slides = h.slides_of(h.parse(text))
+    if arch == "showcase":
+        pages = [fill(slides[0].html(), {"title": "Tidewater Pass"}, [render_of(DECK_LEAD)], {"data-id": "cover"})]
+        pages += _body_pages(root, render_of, plan_of)
+        pages.append(_claims_page(root))
+    else:
+        sk = {s.get("data-id"): s.html() for s in slides}
+        pages = [fill(sk["cover"], {"title": "Tidewater Pass"}, [render_of(DECK_LEAD)], {"data-id": "cover"}),
+                 fill(sk["understanding"], {"sub": "Where the stand sits and what the tender asks"}),
+                 fill(sk["design"], {"sub": "Two concepts answering the tender point by point"})]
+        pages += _body_pages(root, render_of, plan_of)
+        pages += [fill(sk["interaction"], {"sub": "How visitors try the Tidewater Pass app"}), sk["separate"]]
+        table = h.element(sk["appendix"])
+        rows = [n for n in table.iter() if n.tag == "tr" and n.get("data-repeat") == "row"]
+        clauses = common.clauses_of(common.read_json(str(root / "brief" / "brief.json")))
+        targets = ("a-board", "interaction", "separate", "separate")
+        texts = {"title": "Response to the tender", "col1": "Clause", "col2": "Our response", "col3": "Pages",
+                 "foot": "Pages refer to this proposal"}
+        for k, (row, clause, target) in enumerate(zip(rows, clauses, targets), 1):
+            row.set("data-clause", clause["n"])
+            texts.update({f"r{k}-a": clause["n"], f"r{k}-b": clause["text"],
+                          f"r{k}-c": f'<span data-ref="{target}"></span>'})
+        pages.append(fill(table.html(), texts))
+        pages.append(_claims_page(root))
+    _write_deck_pages(root, pages)
+
+
+def deck_project(tmp_path, lang: str = "en", arch: str = "showcase") -> Path:
+    """tmp_path/deck-project (showcase) or tmp_path/deck-project-<arch>: build_project (with the logo in
+    brief/brand), two selected concepts (set-2/B shown as A, set-1/A shown as B and lead), reviewed chosen
+    renders, geometry and plans, and a deck. Showcase: eight slides (cover, a-board, a-plan, b-board, b-plan,
+    b-annotated, compare, claims). Tender: cover, understanding, design, the six concept pages, interaction,
+    separate, the clause table, claims. Built once per (language, architecture) with the real commands and
+    copied for each caller."""
     import atexit
     import shutil
     import tempfile
-    if lang not in _DECK_CACHE:
+    key = (lang, arch)
+    if key not in _DECK_CACHE:
         base = Path(tempfile.mkdtemp(prefix="deck-project-"))
         atexit.register(shutil.rmtree, str(base), True)
-        _build_deck_project(base / "p", lang)
-        _DECK_CACHE[lang] = str(base / "p")
-    dest = Path(tmp_path) / "deck-project"
-    shutil.copytree(_DECK_CACHE[lang], dest)
+        _build_deck_project(base / "p", lang, arch)
+        _DECK_CACHE[key] = str(base / "p")
+    dest = Path(tmp_path) / ("deck-project" if arch == "showcase" else f"deck-project-{arch}")
+    shutil.copytree(_DECK_CACHE[key], dest)
     return dest
 
 
